@@ -250,7 +250,8 @@ class Data{
 
 
 
-  // TODO 
+  // UI에서 값을 표시하기 위한 함수
+  
   String getValue(String checkNum, int index){
     if (measurements.containsKey(checkNum)){
       if(measurements[checkNum]!.length > index){

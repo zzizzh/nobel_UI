@@ -1,9 +1,14 @@
+import 'package:test_novel_i_r_i_s3/widgets/IndexedText.dart';
+import 'package:test_novel_i_r_i_s3/widgets/downloadButton.dart';
+
+import '../../data/nobel_data.dart';
+import '../../utils/const.dart';
+import '../../utils/functions.dart';
 import '/flutter_flow/flutter_flow_button_tabbar.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import 'dart:ui';
-import '/flutter_flow/custom_functions.dart' as functions;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
@@ -12,6 +17,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'test_model.dart';
 export 'test_model.dart';
+import 'dart:convert';
+import 'dart:typed_data';
+import 'dart:io';
+import 'package:intl/intl.dart';
 
 class TestWidget extends StatefulWidget {
   const TestWidget({super.key});
@@ -24,15 +33,21 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
   late TestModel _model;
 
   final scaffoldKey = GlobalKey<ScaffoldState>();
+  int tabIndex = 0;
+  // Map receivedImages = jsonDecode(jsonEncode(Constants.JSON_DATA_MAP));
+  List receivedImages = [null, null, null, null, null, null];
 
   @override
   void initState() {
     super.initState();
+
     _model = createModel(context, () => TestModel());
+    startSocket();
 
     // On page load action.
     SchedulerBinding.instance.addPostFrameCallback((_) async {
       FFAppState().CurrentDate = FFAppState().CurrentDate;
+
       safeSetState(() {});
     });
 
@@ -41,6 +56,127 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
       length: 6,
       initialIndex: 0,
     )..addListener(() => safeSetState(() {}));
+  }
+
+  void saveNestedMapToFile(dynamic nestedMap) {
+    // 중첩된 Map을 JSON으로 변환
+    final jsonMap = nestedMap.map((outerKey, innerMap) {
+      return MapEntry(
+        outerKey,
+        innerMap.map((innerKey, value) => MapEntry(innerKey, value.toJson())),
+      );
+    }); // JSON 문자열로 변환
+    final jsonString = jsonEncode(jsonMap);
+
+    saveJsonToFile(Constants.dataPath, jsonString); // 저장하거나 파일에 기록
+  }
+
+  void startSocket() async {
+    try {
+      final socket = await Socket.connect('127.0.0.1', 12345);
+      print('Connected to server');
+
+      // 데이터 버퍼 생성
+      Uint8List? buffer;
+
+      // 데이터 수신
+      socket.listen((Uint8List packet) {
+        // 기존 버퍼에 새 데이터 추가
+        if (buffer == null) {
+          buffer = packet;
+        } else {
+          buffer = Uint8List.fromList(buffer! + packet);
+        }
+
+        // 버퍼에 충분한 데이터가 있는지 확인
+        while (buffer != null && buffer!.length >= 4) {
+          // JSON 길이 추출
+          final lengthData = buffer!.sublist(0, 4); // JSON 길이
+          final messageLength = ByteData.sublistView(lengthData).getUint32(0);
+
+          // 버퍼에 JSON 데이터까지 충분히 도착했는지 확인
+          if (buffer!.length < 4 + messageLength) {
+            // 아직 데이터가 부족하면 더 기다림
+            break;
+          }
+
+          // JSON 데이터 추출
+          final jsonData = utf8.decode(buffer!.sublist(4, 4 + messageLength));
+          final receivedMap = json.decode(jsonData);
+
+          String date = receivedMap["date"];
+          String name = receivedMap["name"];
+          if (!Measurements.dateList.contains(date)) {
+            Measurements.dateList.add(date);
+            Measurements.dateList.sort((a, b) {
+              // 문자열을 DateTime으로 변환 후 비교
+              DateTime dateA = DateTime.parse(a);
+              DateTime dateB = DateTime.parse(b);
+              return dateA.compareTo(dateB);
+            });
+          }
+
+          Measurements data;
+          if (Measurements.data[name]!.containsKey(date)) {
+            data = Measurements.data[name]![date]!;
+            data.writeValue(receivedMap["values"]);
+          } else {
+            data = Measurements.fromServer(receivedMap);
+          }
+
+          Map dateListMap = {"dateList": Measurements.dateList};
+
+          saveJsonToFile(Constants.dataPath, json.encode(dateListMap));
+          saveJsonToFile(Constants.dateListPath, json.encode(dateListMap));
+
+          // UI 업데이트
+          setState(() {
+            receivedImages[Constants.names.indexOf(receivedMap['name'])] =
+                base64Decode(receivedMap['image']);
+            // if (!receivedImages[name].containsKey(date)){
+            //   receivedImages[name][date] = [];
+            // }
+            // receivedImages[name][date].add(base64Decode(receivedMap['image']));
+          });
+
+          // 처리 완료한 데이터 제거
+          if (buffer!.length > 4 + messageLength) {
+            buffer = buffer!.sublist(4 + messageLength); // 남은 데이터 유지
+          } else {
+            buffer = null; // 모든 데이터 처리 완료
+          }
+        }
+      });
+    } catch (e) {
+      print('Error: $e');
+    }
+  }
+
+  // Future<void> saveExcelFile(String startDate){
+
+  // }
+
+  Future<void> saveJsonToFile(String filePath, String jsonString) async {
+    try {
+      // 파일 경로에서 폴더 경로 추출
+      final directoryPath = Directory(filePath).parent.path;
+
+      // 폴더 존재 여부 확인
+      final directory = Directory(directoryPath);
+      if (!await directory.exists()) {
+        // 폴더가 없으면 생성
+        await directory.create(recursive: true);
+        print('폴더 생성: $directoryPath');
+      }
+
+      // 파일 생성 및 데이터 쓰기
+      final file = File(filePath);
+      await file.writeAsString(jsonString);
+
+      print('JSON 데이터가 저장되었습니다: $filePath');
+    } catch (e) {
+      print('파일 저장 중 오류 발생: $e');
+    }
   }
 
   @override
@@ -53,6 +189,8 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     context.watch<FFAppState>();
+
+    IndexedText.initState();
 
     return GestureDetector(
       onTap: () {
@@ -75,7 +213,6 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                   hoverColor: Colors.transparent,
                   highlightColor: Colors.transparent,
                   onDoubleTap: () async {
-                    FFAppState().CurrentDate = functions.getCurrentDate()!;
                     safeSetState(() {});
                   },
                   child: Column(
@@ -99,7 +236,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                           .secondaryBackground,
                                     ),
                                     child: Align(
-                                      alignment: AlignmentDirectional(0.0, 0.0),
+                                      alignment: const AlignmentDirectional(0.0, 0.0),
                                       child: Row(
                                         mainAxisSize: MainAxisSize.max,
                                         mainAxisAlignment:
@@ -109,7 +246,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                         children: [
                                           Padding(
                                             padding:
-                                                EdgeInsetsDirectional.fromSTEB(
+                                                const EdgeInsetsDirectional.fromSTEB(
                                                     24.0, 0.0, 0.0, 0.0),
                                             child: Container(
                                               width: MediaQuery.sizeOf(context)
@@ -121,7 +258,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                     FlutterFlowTheme.of(context)
                                                         .secondaryBackground,
                                                 border: Border.all(
-                                                  color: Color(0x00FFFFFF),
+                                                  color: const Color(0x00FFFFFF),
                                                 ),
                                               ),
                                               child: Row(
@@ -129,7 +266,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                 children: [
                                                   Padding(
                                                     padding:
-                                                        EdgeInsetsDirectional
+                                                        const EdgeInsetsDirectional
                                                             .fromSTEB(4.0, 4.0,
                                                                 4.0, 4.0),
                                                     child: ClipRRect(
@@ -149,7 +286,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                   ),
                                                   Padding(
                                                     padding:
-                                                        EdgeInsetsDirectional
+                                                        const EdgeInsetsDirectional
                                                             .fromSTEB(8.0, 0.0,
                                                                 0.0, 0.0),
                                                     child: Text(
@@ -174,7 +311,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                           ),
                                           Align(
                                             alignment:
-                                                AlignmentDirectional(0.0, 0.0),
+                                                const AlignmentDirectional(0.0, 0.0),
                                             child: Container(
                                               width: MediaQuery.sizeOf(context)
                                                       .width *
@@ -191,7 +328,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                   width: 0.0,
                                                 ),
                                               ),
-                                              alignment: AlignmentDirectional(
+                                              alignment: const AlignmentDirectional(
                                                   0.0, 0.0),
                                               child: Column(
                                                 mainAxisSize: MainAxisSize.max,
@@ -214,15 +351,15 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                         decoration:
                                                             BoxDecoration(
                                                           color:
-                                                              Color(0x32B6B6B6),
+                                                              const Color(0x32B6B6B6),
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             '차종(모델)',
@@ -264,13 +401,13 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   .of(context)
                                                               .secondaryBackground,
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             'Aurora1',
@@ -307,15 +444,15 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                         decoration:
                                                             BoxDecoration(
                                                           color:
-                                                              Color(0x32B6B6B6),
+                                                              const Color(0x32B6B6B6),
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             '공정명',
@@ -357,13 +494,13 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   .of(context)
                                                               .secondaryBackground,
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             'Φ8 SUS304\nmale tube 성형',
@@ -406,15 +543,15 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                         decoration:
                                                             BoxDecoration(
                                                           color:
-                                                              Color(0x32B6B6B6),
+                                                              const Color(0x32B6B6B6),
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             '품번',
@@ -454,13 +591,13 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   .of(context)
                                                               .secondaryBackground,
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             '6608076696/8891471700',
@@ -497,15 +634,15 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                         decoration:
                                                             BoxDecoration(
                                                           color:
-                                                              Color(0x32B6B6B6),
+                                                              const Color(0x32B6B6B6),
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             '특별특성',
@@ -547,13 +684,13 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   .of(context)
                                                               .secondaryBackground,
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: ClipRRect(
                                                             borderRadius:
@@ -590,15 +727,15 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                         decoration:
                                                             BoxDecoration(
                                                           color:
-                                                              Color(0x32B6B6B6),
+                                                              const Color(0x32B6B6B6),
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             '구분',
@@ -640,13 +777,13 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   .of(context)
                                                               .secondaryBackground,
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Padding(
                                                           padding:
-                                                              EdgeInsetsDirectional
+                                                              const EdgeInsetsDirectional
                                                                   .fromSTEB(
                                                                       0.0,
                                                                       0.0,
@@ -662,11 +799,11 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                             children: [
                                                               Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: EdgeInsetsDirectional
+                                                                  padding: const EdgeInsetsDirectional
                                                                       .fromSTEB(
                                                                           4.0,
                                                                           0.0,
@@ -681,7 +818,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                             .height *
                                                                         0.013,
                                                                     decoration:
-                                                                        BoxDecoration(
+                                                                        const BoxDecoration(
                                                                       color: Colors
                                                                           .black,
                                                                     ),
@@ -707,11 +844,11 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                               ),
                                                               Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: EdgeInsetsDirectional
+                                                                  padding: const EdgeInsetsDirectional
                                                                       .fromSTEB(
                                                                           12.0,
                                                                           0.0,
@@ -758,11 +895,11 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                               ),
                                                               Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: EdgeInsetsDirectional
+                                                                  padding: const EdgeInsetsDirectional
                                                                       .fromSTEB(
                                                                           12.0,
                                                                           0.0,
@@ -809,11 +946,11 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                               ),
                                                               Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: EdgeInsetsDirectional
+                                                                  padding: const EdgeInsetsDirectional
                                                                       .fromSTEB(
                                                                           12.0,
                                                                           0.0,
@@ -876,15 +1013,15 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                         decoration:
                                                             BoxDecoration(
                                                           color:
-                                                              Color(0x32B6B6B6),
+                                                              const Color(0x32B6B6B6),
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             '관리번호',
@@ -926,13 +1063,13 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   .of(context)
                                                               .secondaryBackground,
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             'MS-010',
@@ -977,7 +1114,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                               CrossAxisAlignment.center,
                                           children: [
                                             Align(
-                                              alignment: AlignmentDirectional(
+                                              alignment: const AlignmentDirectional(
                                                   0.0, 0.0),
                                               child: Container(
                                                 width:
@@ -997,7 +1134,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                   ),
                                                 ),
                                                 child: Padding(
-                                                  padding: EdgeInsetsDirectional
+                                                  padding: const EdgeInsetsDirectional
                                                       .fromSTEB(
                                                           8.0, 8.0, 8.0, 8.0),
                                                   child: ClipRRect(
@@ -1015,10 +1152,10 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                               ),
                                             ),
                                             Align(
-                                              alignment: AlignmentDirectional(
+                                              alignment: const AlignmentDirectional(
                                                   0.0, 0.0),
                                               child: Padding(
-                                                padding: EdgeInsetsDirectional
+                                                padding: const EdgeInsetsDirectional
                                                     .fromSTEB(
                                                         0.0, 8.0, 0.0, 0.0),
                                                 child: Container(
@@ -1040,7 +1177,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                     ),
                                                   ),
                                                   alignment:
-                                                      AlignmentDirectional(
+                                                      const AlignmentDirectional(
                                                           0.0, 0.0),
                                                   child: ClipRRect(
                                                     borderRadius:
@@ -1063,10 +1200,10 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                               ),
                                             ),
                                             Align(
-                                              alignment: AlignmentDirectional(
+                                              alignment: const AlignmentDirectional(
                                                   0.0, 1.0),
                                               child: Padding(
-                                                padding: EdgeInsetsDirectional
+                                                padding: const EdgeInsetsDirectional
                                                     .fromSTEB(
                                                         0.0, 8.0, 0.0, 0.0),
                                                 child: Container(
@@ -1088,7 +1225,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                   ),
                                                   child: Padding(
                                                     padding:
-                                                        EdgeInsetsDirectional
+                                                        const EdgeInsetsDirectional
                                                             .fromSTEB(16.0, 4.0,
                                                                 16.0, 0.0),
                                                     child: Text(
@@ -1120,7 +1257,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                               CrossAxisAlignment.center,
                                           children: [
                                             Align(
-                                              alignment: AlignmentDirectional(
+                                              alignment: const AlignmentDirectional(
                                                   0.0, 0.0),
                                               child: Row(
                                                 mainAxisSize: MainAxisSize.max,
@@ -1129,7 +1266,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                 children: [
                                                   Padding(
                                                     padding:
-                                                        EdgeInsetsDirectional
+                                                        const EdgeInsetsDirectional
                                                             .fromSTEB(0.0, 0.0,
                                                                 16.0, 0.0),
                                                     child: InkWell(
@@ -1144,13 +1281,13 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                       onTap: () async {
                                                         FFAppState()
                                                                 .CurrentDate =
-                                                            functions.updateDate(
+                                                            FFAppState().updateDate(
                                                                 FFAppState()
                                                                     .CurrentDate,
                                                                 -1)!;
                                                         safeSetState(() {});
                                                       },
-                                                      child: FaIcon(
+                                                      child: const FaIcon(
                                                         FontAwesomeIcons
                                                             .caretLeft,
                                                         color:
@@ -1161,11 +1298,11 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                   ),
                                                   Align(
                                                     alignment:
-                                                        AlignmentDirectional(
+                                                        const AlignmentDirectional(
                                                             0.0, 0.0),
                                                     child: Padding(
                                                       padding:
-                                                          EdgeInsetsDirectional
+                                                          const EdgeInsetsDirectional
                                                               .fromSTEB(
                                                                   0.0,
                                                                   0.0,
@@ -1193,20 +1330,10 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                   ),
                                                   Align(
                                                     alignment:
-                                                        AlignmentDirectional(
+                                                        const AlignmentDirectional(
                                                             0.0, 0.0),
                                                     child: Text(
-                                                      valueOrDefault<String>(
-                                                        dateTimeFormat(
-                                                          "yyyy-MM-dd",
-                                                          _model.datePicked1,
-                                                          locale:
-                                                              FFLocalizations.of(
-                                                                      context)
-                                                                  .languageCode,
-                                                        ),
-                                                        'DateTime.now()',
-                                                      ),
+                                                      FFAppState().CurrentDate,
                                                       textAlign:
                                                           TextAlign.center,
                                                       style: FlutterFlowTheme
@@ -1223,7 +1350,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                   ),
                                                   Padding(
                                                     padding:
-                                                        EdgeInsetsDirectional
+                                                        const EdgeInsetsDirectional
                                                             .fromSTEB(16.0, 0.0,
                                                                 0.0, 0.0),
                                                     child: InkWell(
@@ -1239,8 +1366,9 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                         final _datePicked1Date =
                                                             await showDatePicker(
                                                           context: context,
-                                                          initialDate:
-                                                              getCurrentTimestamp,
+                                                          initialDate: DateTime
+                                                              .parse(FFAppState()
+                                                                  .CurrentDate),
                                                           firstDate:
                                                               DateTime(1900),
                                                           lastDate:
@@ -1251,7 +1379,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                               context,
                                                               child!,
                                                               headerBackgroundColor:
-                                                                  Color(
+                                                                  const Color(
                                                                       0xFF08018C),
                                                               headerForegroundColor:
                                                                   FlutterFlowTheme.of(
@@ -1280,7 +1408,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                           context)
                                                                       .primaryText,
                                                               selectedDateTimeBackgroundColor:
-                                                                  Color(
+                                                                  const Color(
                                                                       0xFF08018C),
                                                               selectedDateTimeForegroundColor:
                                                                   FlutterFlowTheme.of(
@@ -1298,19 +1426,37 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                         if (_datePicked1Date !=
                                                             null) {
                                                           safeSetState(() {
-                                                            _model.datePicked1 =
-                                                                DateTime(
-                                                              _datePicked1Date
-                                                                  .year,
-                                                              _datePicked1Date
-                                                                  .month,
-                                                              _datePicked1Date
-                                                                  .day,
-                                                            );
+                                                            if (_datePicked1Date
+                                                                    .month <
+                                                                10) {
+                                                              if (_datePicked1Date
+                                                                      .day <
+                                                                  10) {
+                                                                FFAppState()
+                                                                        .CurrentDate =
+                                                                    "${_datePicked1Date.year}-0${_datePicked1Date.month}-0${_datePicked1Date.day}";
+                                                              } else {
+                                                                FFAppState()
+                                                                        .CurrentDate =
+                                                                    "${_datePicked1Date.year}-0${_datePicked1Date.month}-${_datePicked1Date.day}";
+                                                              }
+                                                            } else {
+                                                              if (_datePicked1Date
+                                                                      .day <
+                                                                  10) {
+                                                                FFAppState()
+                                                                        .CurrentDate =
+                                                                    "${_datePicked1Date.year}-${_datePicked1Date.month}-0${_datePicked1Date.day}";
+                                                              } else {
+                                                                FFAppState()
+                                                                        .CurrentDate =
+                                                                    "${_datePicked1Date.year}-${_datePicked1Date.month}-${_datePicked1Date.day}";
+                                                              }
+                                                            }
                                                           });
                                                         }
                                                       },
-                                                      child: Icon(
+                                                      child: const Icon(
                                                         Icons.calendar_month,
                                                         color:
                                                             Color(0xFF08018C),
@@ -1320,7 +1466,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                   ),
                                                   Padding(
                                                     padding:
-                                                        EdgeInsetsDirectional
+                                                        const EdgeInsetsDirectional
                                                             .fromSTEB(16.0, 0.0,
                                                                 0.0, 0.0),
                                                     child: InkWell(
@@ -1335,13 +1481,13 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                       onTap: () async {
                                                         FFAppState()
                                                                 .CurrentDate =
-                                                            functions.updateDate(
+                                                            FFAppState().updateDate(
                                                                 FFAppState()
                                                                     .CurrentDate,
                                                                 1)!;
                                                         safeSetState(() {});
                                                       },
-                                                      child: FaIcon(
+                                                      child: const FaIcon(
                                                         FontAwesomeIcons
                                                             .caretRight,
                                                         color:
@@ -1351,7 +1497,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                     ),
                                                   ),
                                                 ].addToStart(
-                                                    SizedBox(width: 40.0)),
+                                                    const SizedBox(width: 40.0)),
                                               ),
                                             ),
                                             Container(
@@ -1379,15 +1525,15 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                             .height *
                                                         0.045,
                                                     decoration: BoxDecoration(
-                                                      color: Color(0xFF08018C),
+                                                      color: const Color(0xFF08018C),
                                                       border: Border.all(
                                                         color:
-                                                            Color(0x80000000),
+                                                            const Color(0x80000000),
                                                       ),
                                                     ),
                                                     child: Align(
                                                       alignment:
-                                                          AlignmentDirectional(
+                                                          const AlignmentDirectional(
                                                               0.0, 0.0),
                                                       child: Text(
                                                         '품번',
@@ -1424,12 +1570,12 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                           .secondaryBackground,
                                                       border: Border.all(
                                                         color:
-                                                            Color(0x80000000),
+                                                            const Color(0x80000000),
                                                       ),
                                                     ),
                                                     child: Align(
                                                       alignment:
-                                                          AlignmentDirectional(
+                                                          const AlignmentDirectional(
                                                               0.0, 0.0),
                                                       child: Text(
                                                         '품번 입력',
@@ -1453,7 +1599,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                               ),
                                             ),
                                             Padding(
-                                              padding: EdgeInsetsDirectional
+                                              padding: const EdgeInsetsDirectional
                                                   .fromSTEB(0.0, 8.0, 0.0, 8.0),
                                               child: Container(
                                                 width:
@@ -1473,19 +1619,31 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                   ),
                                                 ),
                                                 child: Padding(
-                                                  padding: EdgeInsetsDirectional
+                                                  padding: const EdgeInsetsDirectional
                                                       .fromSTEB(
                                                           8.0, 8.0, 8.0, 8.0),
                                                   child: ClipRRect(
                                                     borderRadius:
                                                         BorderRadius.circular(
                                                             0.0),
-                                                    child: Image.network(
-                                                      'https://picsum.photos/seed/856/60',
-                                                      width: 200.0,
-                                                      height: 200.0,
-                                                      fit: BoxFit.cover,
-                                                    ),
+                                                    child: receivedImages[_model
+                                                                .tabBarCurrentIndex] !=
+                                                            null
+                                                        ? Image.memory(
+                                                            receivedImages[_model
+                                                                .tabBarCurrentIndex]!,
+                                                            height: 300,
+                                                            width:
+                                                                double.infinity,
+                                                            fit: BoxFit
+                                                                .fitHeight,
+                                                          )
+                                                        : Image.network(
+                                                            'https://picsum.photos/seed/510/60',
+                                                            width: 200.0,
+                                                            height: 200.0,
+                                                            fit: BoxFit.cover,
+                                                          ),
                                                   ),
                                                 ),
                                               ),
@@ -1499,11 +1657,11 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                               children: [
                                                 Align(
                                                   alignment:
-                                                      AlignmentDirectional(
+                                                      const AlignmentDirectional(
                                                           0.0, 0.0),
                                                   child: Padding(
                                                     padding:
-                                                        EdgeInsetsDirectional
+                                                        const EdgeInsetsDirectional
                                                             .fromSTEB(2.0, 2.0,
                                                                 2.0, 2.0),
                                                     child: Container(
@@ -1525,7 +1683,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                         ),
                                                       ),
                                                       alignment:
-                                                          AlignmentDirectional(
+                                                          const AlignmentDirectional(
                                                               0.0, 0.0),
                                                       child: Column(
                                                         mainAxisSize:
@@ -1547,17 +1705,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     0.04,
                                                                 decoration:
                                                                     BoxDecoration(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0xFF08018C),
                                                                   border: Border
                                                                       .all(
-                                                                    color: Color(
+                                                                    color: const Color(
                                                                         0x80000000),
                                                                   ),
                                                                 ),
                                                                 child: Align(
                                                                   alignment:
-                                                                      AlignmentDirectional(
+                                                                      const AlignmentDirectional(
                                                                           0.0,
                                                                           0.0),
                                                                   child: Text(
@@ -1591,17 +1749,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     0.04,
                                                                 decoration:
                                                                     BoxDecoration(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0xFF08018C),
                                                                   border: Border
                                                                       .all(
-                                                                    color: Color(
+                                                                    color: const Color(
                                                                         0x80000000),
                                                                   ),
                                                                 ),
                                                                 child: Align(
                                                                   alignment:
-                                                                      AlignmentDirectional(
+                                                                      const AlignmentDirectional(
                                                                           0.0,
                                                                           0.0),
                                                                   child: Text(
@@ -1635,17 +1793,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     0.04,
                                                                 decoration:
                                                                     BoxDecoration(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0xFF08018C),
                                                                   border: Border
                                                                       .all(
-                                                                    color: Color(
+                                                                    color: const Color(
                                                                         0x80000000),
                                                                   ),
                                                                 ),
                                                                 child: Align(
                                                                   alignment:
-                                                                      AlignmentDirectional(
+                                                                      const AlignmentDirectional(
                                                                           0.0,
                                                                           0.0),
                                                                   child: Text(
@@ -1679,17 +1837,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     0.04,
                                                                 decoration:
                                                                     BoxDecoration(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0xFF08018C),
                                                                   border: Border
                                                                       .all(
-                                                                    color: Color(
+                                                                    color: const Color(
                                                                         0x80000000),
                                                                   ),
                                                                 ),
                                                                 child: Align(
                                                                   alignment:
-                                                                      AlignmentDirectional(
+                                                                      const AlignmentDirectional(
                                                                           0.0,
                                                                           0.0),
                                                                   child: Text(
@@ -1723,18 +1881,18 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     0.04,
                                                                 decoration:
                                                                     BoxDecoration(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0xFF08018C),
                                                                   border: Border
                                                                       .all(
-                                                                    color: Color(
+                                                                    color: const Color(
                                                                         0x80000000),
                                                                     width: 2.0,
                                                                   ),
                                                                 ),
                                                                 child: Align(
                                                                   alignment:
-                                                                      AlignmentDirectional(
+                                                                      const AlignmentDirectional(
                                                                           0.0,
                                                                           0.0),
                                                                   child: Text(
@@ -1775,17 +1933,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     0.04,
                                                                 decoration:
                                                                     BoxDecoration(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x3308018C),
                                                                   border: Border
                                                                       .all(
-                                                                    color: Color(
+                                                                    color: const Color(
                                                                         0x80000000),
                                                                   ),
                                                                 ),
                                                                 child: Align(
                                                                   alignment:
-                                                                      AlignmentDirectional(
+                                                                      const AlignmentDirectional(
                                                                           0.0,
                                                                           0.0),
                                                                   child: Text(
@@ -1806,6 +1964,9 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   ),
                                                                 ),
                                                               ),
+                                                              IndexedText(),
+                                                              IndexedText(),
+                                                              IndexedText(),
                                                               Container(
                                                                 width: MediaQuery.sizeOf(
                                                                             context)
@@ -1817,147 +1978,18 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     0.04,
                                                                 decoration:
                                                                     BoxDecoration(
-                                                                  color: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .secondaryBackground,
-                                                                  border: Border
-                                                                      .all(
-                                                                    color: Color(
-                                                                        0x80000000),
-                                                                  ),
-                                                                ),
-                                                                child: Align(
-                                                                  alignment:
-                                                                      AlignmentDirectional(
-                                                                          0.0,
-                                                                          0.0),
-                                                                  child: Text(
-                                                                    '초1',
-                                                                    style: FlutterFlowTheme.of(
-                                                                            context)
-                                                                        .bodyMedium
-                                                                        .override(
-                                                                          fontFamily:
-                                                                              'Inter',
-                                                                          fontSize:
-                                                                              23.0,
-                                                                          letterSpacing:
-                                                                              0.0,
-                                                                          fontWeight:
-                                                                              FontWeight.w600,
-                                                                        ),
-                                                                  ),
-                                                                ),
-                                                              ),
-                                                              Container(
-                                                                width: MediaQuery.sizeOf(
-                                                                            context)
-                                                                        .width *
-                                                                    0.07,
-                                                                height: MediaQuery.sizeOf(
-                                                                            context)
-                                                                        .height *
-                                                                    0.04,
-                                                                decoration:
-                                                                    BoxDecoration(
-                                                                  color: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .secondaryBackground,
-                                                                  border: Border
-                                                                      .all(
-                                                                    color: Color(
-                                                                        0x80000000),
-                                                                  ),
-                                                                ),
-                                                                child: Align(
-                                                                  alignment:
-                                                                      AlignmentDirectional(
-                                                                          0.0,
-                                                                          0.0),
-                                                                  child: Text(
-                                                                    '중1',
-                                                                    style: FlutterFlowTheme.of(
-                                                                            context)
-                                                                        .bodyMedium
-                                                                        .override(
-                                                                          fontFamily:
-                                                                              'Inter',
-                                                                          fontSize:
-                                                                              23.0,
-                                                                          letterSpacing:
-                                                                              0.0,
-                                                                          fontWeight:
-                                                                              FontWeight.w600,
-                                                                        ),
-                                                                  ),
-                                                                ),
-                                                              ),
-                                                              Container(
-                                                                width: MediaQuery.sizeOf(
-                                                                            context)
-                                                                        .width *
-                                                                    0.07,
-                                                                height: MediaQuery.sizeOf(
-                                                                            context)
-                                                                        .height *
-                                                                    0.04,
-                                                                decoration:
-                                                                    BoxDecoration(
-                                                                  color: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .secondaryBackground,
-                                                                  border: Border
-                                                                      .all(
-                                                                    color: Color(
-                                                                        0x80000000),
-                                                                  ),
-                                                                ),
-                                                                child: Align(
-                                                                  alignment:
-                                                                      AlignmentDirectional(
-                                                                          0.0,
-                                                                          0.0),
-                                                                  child: Text(
-                                                                    '종1',
-                                                                    style: FlutterFlowTheme.of(
-                                                                            context)
-                                                                        .bodyMedium
-                                                                        .override(
-                                                                          fontFamily:
-                                                                              'Inter',
-                                                                          fontSize:
-                                                                              23.0,
-                                                                          letterSpacing:
-                                                                              0.0,
-                                                                          fontWeight:
-                                                                              FontWeight.w600,
-                                                                        ),
-                                                                  ),
-                                                                ),
-                                                              ),
-                                                              Container(
-                                                                width: MediaQuery.sizeOf(
-                                                                            context)
-                                                                        .width *
-                                                                    0.07,
-                                                                height: MediaQuery.sizeOf(
-                                                                            context)
-                                                                        .height *
-                                                                    0.04,
-                                                                decoration:
-                                                                    BoxDecoration(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x66B6B6B6),
                                                                   border: Border
                                                                       .all(
-                                                                    color: Color(
+                                                                    color: const Color(
                                                                         0x80000000),
                                                                     width: 1.0,
                                                                   ),
                                                                 ),
                                                                 child: Align(
                                                                   alignment:
-                                                                      AlignmentDirectional(
+                                                                      const AlignmentDirectional(
                                                                           0.0,
                                                                           0.0),
                                                                   child: Text(
@@ -1996,17 +2028,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     0.04,
                                                                 decoration:
                                                                     BoxDecoration(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x3308018C),
                                                                   border: Border
                                                                       .all(
-                                                                    color: Color(
+                                                                    color: const Color(
                                                                         0x80000000),
                                                                   ),
                                                                 ),
                                                                 child: Align(
                                                                   alignment:
-                                                                      AlignmentDirectional(
+                                                                      const AlignmentDirectional(
                                                                           0.0,
                                                                           0.0),
                                                                   child: Text(
@@ -2027,6 +2059,9 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   ),
                                                                 ),
                                                               ),
+                                                              IndexedText(),
+                                                              IndexedText(),
+                                                              IndexedText(),
                                                               Container(
                                                                 width: MediaQuery.sizeOf(
                                                                             context)
@@ -2038,147 +2073,18 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     0.04,
                                                                 decoration:
                                                                     BoxDecoration(
-                                                                  color: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .secondaryBackground,
-                                                                  border: Border
-                                                                      .all(
-                                                                    color: Color(
-                                                                        0x80000000),
-                                                                  ),
-                                                                ),
-                                                                child: Align(
-                                                                  alignment:
-                                                                      AlignmentDirectional(
-                                                                          0.0,
-                                                                          0.0),
-                                                                  child: Text(
-                                                                    '초2',
-                                                                    style: FlutterFlowTheme.of(
-                                                                            context)
-                                                                        .bodyMedium
-                                                                        .override(
-                                                                          fontFamily:
-                                                                              'Inter',
-                                                                          fontSize:
-                                                                              23.0,
-                                                                          letterSpacing:
-                                                                              0.0,
-                                                                          fontWeight:
-                                                                              FontWeight.w600,
-                                                                        ),
-                                                                  ),
-                                                                ),
-                                                              ),
-                                                              Container(
-                                                                width: MediaQuery.sizeOf(
-                                                                            context)
-                                                                        .width *
-                                                                    0.07,
-                                                                height: MediaQuery.sizeOf(
-                                                                            context)
-                                                                        .height *
-                                                                    0.04,
-                                                                decoration:
-                                                                    BoxDecoration(
-                                                                  color: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .secondaryBackground,
-                                                                  border: Border
-                                                                      .all(
-                                                                    color: Color(
-                                                                        0x80000000),
-                                                                  ),
-                                                                ),
-                                                                child: Align(
-                                                                  alignment:
-                                                                      AlignmentDirectional(
-                                                                          0.0,
-                                                                          0.0),
-                                                                  child: Text(
-                                                                    '중2',
-                                                                    style: FlutterFlowTheme.of(
-                                                                            context)
-                                                                        .bodyMedium
-                                                                        .override(
-                                                                          fontFamily:
-                                                                              'Inter',
-                                                                          fontSize:
-                                                                              23.0,
-                                                                          letterSpacing:
-                                                                              0.0,
-                                                                          fontWeight:
-                                                                              FontWeight.w600,
-                                                                        ),
-                                                                  ),
-                                                                ),
-                                                              ),
-                                                              Container(
-                                                                width: MediaQuery.sizeOf(
-                                                                            context)
-                                                                        .width *
-                                                                    0.07,
-                                                                height: MediaQuery.sizeOf(
-                                                                            context)
-                                                                        .height *
-                                                                    0.04,
-                                                                decoration:
-                                                                    BoxDecoration(
-                                                                  color: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .secondaryBackground,
-                                                                  border: Border
-                                                                      .all(
-                                                                    color: Color(
-                                                                        0x80000000),
-                                                                  ),
-                                                                ),
-                                                                child: Align(
-                                                                  alignment:
-                                                                      AlignmentDirectional(
-                                                                          0.0,
-                                                                          0.0),
-                                                                  child: Text(
-                                                                    '종2',
-                                                                    style: FlutterFlowTheme.of(
-                                                                            context)
-                                                                        .bodyMedium
-                                                                        .override(
-                                                                          fontFamily:
-                                                                              'Inter',
-                                                                          fontSize:
-                                                                              23.0,
-                                                                          letterSpacing:
-                                                                              0.0,
-                                                                          fontWeight:
-                                                                              FontWeight.w600,
-                                                                        ),
-                                                                  ),
-                                                                ),
-                                                              ),
-                                                              Container(
-                                                                width: MediaQuery.sizeOf(
-                                                                            context)
-                                                                        .width *
-                                                                    0.07,
-                                                                height: MediaQuery.sizeOf(
-                                                                            context)
-                                                                        .height *
-                                                                    0.04,
-                                                                decoration:
-                                                                    BoxDecoration(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x66B6B6B6),
                                                                   border: Border
                                                                       .all(
-                                                                    color: Color(
+                                                                    color: const Color(
                                                                         0x80000000),
                                                                     width: 1.0,
                                                                   ),
                                                                 ),
                                                                 child: Align(
                                                                   alignment:
-                                                                      AlignmentDirectional(
+                                                                      const AlignmentDirectional(
                                                                           0.0,
                                                                           0.0),
                                                                   child: Text(
@@ -2217,17 +2123,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     0.04,
                                                                 decoration:
                                                                     BoxDecoration(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x3308018C),
                                                                   border: Border
                                                                       .all(
-                                                                    color: Color(
+                                                                    color: const Color(
                                                                         0x80000000),
                                                                   ),
                                                                 ),
                                                                 child: Align(
                                                                   alignment:
-                                                                      AlignmentDirectional(
+                                                                      const AlignmentDirectional(
                                                                           0.0,
                                                                           0.0),
                                                                   child: Text(
@@ -2264,17 +2170,21 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                       .secondaryBackground,
                                                                   border: Border
                                                                       .all(
-                                                                    color: Color(
+                                                                    color: const Color(
                                                                         0x80000000),
                                                                   ),
                                                                 ),
                                                                 child: Align(
                                                                   alignment:
-                                                                      AlignmentDirectional(
+                                                                      const AlignmentDirectional(
                                                                           0.0,
                                                                           0.0),
                                                                   child: Text(
-                                                                    '초3',
+                                                                    getValue(
+                                                                        Constants
+                                                                            .names[0],
+                                                                        "3",
+                                                                        0),
                                                                     style: FlutterFlowTheme.of(
                                                                             context)
                                                                         .bodyMedium
@@ -2307,17 +2217,21 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                       .secondaryBackground,
                                                                   border: Border
                                                                       .all(
-                                                                    color: Color(
+                                                                    color: const Color(
                                                                         0x80000000),
                                                                   ),
                                                                 ),
                                                                 child: Align(
                                                                   alignment:
-                                                                      AlignmentDirectional(
+                                                                      const AlignmentDirectional(
                                                                           0.0,
                                                                           0.0),
                                                                   child: Text(
-                                                                    '중3',
+                                                                    getValue(
+                                                                        Constants
+                                                                            .names[0],
+                                                                        "3",
+                                                                        1),
                                                                     style: FlutterFlowTheme.of(
                                                                             context)
                                                                         .bodyMedium
@@ -2350,17 +2264,21 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                       .secondaryBackground,
                                                                   border: Border
                                                                       .all(
-                                                                    color: Color(
+                                                                    color: const Color(
                                                                         0x80000000),
                                                                   ),
                                                                 ),
                                                                 child: Align(
                                                                   alignment:
-                                                                      AlignmentDirectional(
+                                                                      const AlignmentDirectional(
                                                                           0.0,
                                                                           0.0),
                                                                   child: Text(
-                                                                    '종3',
+                                                                    getValue(
+                                                                        Constants
+                                                                            .names[0],
+                                                                        "3",
+                                                                        2),
                                                                     style: FlutterFlowTheme.of(
                                                                             context)
                                                                         .bodyMedium
@@ -2388,22 +2306,25 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     0.04,
                                                                 decoration:
                                                                     BoxDecoration(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x66B6B6B6),
                                                                   border: Border
                                                                       .all(
-                                                                    color: Color(
+                                                                    color: const Color(
                                                                         0x80000000),
                                                                     width: 1.0,
                                                                   ),
                                                                 ),
                                                                 child: Align(
                                                                   alignment:
-                                                                      AlignmentDirectional(
+                                                                      const AlignmentDirectional(
                                                                           0.0,
                                                                           0.0),
                                                                   child: Text(
-                                                                    '평균3',
+                                                                    getAverage(
+                                                                        Constants
+                                                                            .names[0],
+                                                                        "3"),
                                                                     style: FlutterFlowTheme.of(
                                                                             context)
                                                                         .bodyMedium
@@ -2438,17 +2359,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     0.04,
                                                                 decoration:
                                                                     BoxDecoration(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x3308018C),
                                                                   border: Border
                                                                       .all(
-                                                                    color: Color(
+                                                                    color: const Color(
                                                                         0x80000000),
                                                                   ),
                                                                 ),
                                                                 child: Align(
                                                                   alignment:
-                                                                      AlignmentDirectional(
+                                                                      const AlignmentDirectional(
                                                                           0.0,
                                                                           0.0),
                                                                   child: Text(
@@ -2469,6 +2390,9 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   ),
                                                                 ),
                                                               ),
+                                                              IndexedText(),
+                                                              IndexedText(),
+                                                              IndexedText(),
                                                               Container(
                                                                 width: MediaQuery.sizeOf(
                                                                             context)
@@ -2480,147 +2404,18 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     0.04,
                                                                 decoration:
                                                                     BoxDecoration(
-                                                                  color: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .secondaryBackground,
-                                                                  border: Border
-                                                                      .all(
-                                                                    color: Color(
-                                                                        0x80000000),
-                                                                  ),
-                                                                ),
-                                                                child: Align(
-                                                                  alignment:
-                                                                      AlignmentDirectional(
-                                                                          0.0,
-                                                                          0.0),
-                                                                  child: Text(
-                                                                    '초4',
-                                                                    style: FlutterFlowTheme.of(
-                                                                            context)
-                                                                        .bodyMedium
-                                                                        .override(
-                                                                          fontFamily:
-                                                                              'Inter',
-                                                                          fontSize:
-                                                                              23.0,
-                                                                          letterSpacing:
-                                                                              0.0,
-                                                                          fontWeight:
-                                                                              FontWeight.w600,
-                                                                        ),
-                                                                  ),
-                                                                ),
-                                                              ),
-                                                              Container(
-                                                                width: MediaQuery.sizeOf(
-                                                                            context)
-                                                                        .width *
-                                                                    0.07,
-                                                                height: MediaQuery.sizeOf(
-                                                                            context)
-                                                                        .height *
-                                                                    0.04,
-                                                                decoration:
-                                                                    BoxDecoration(
-                                                                  color: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .secondaryBackground,
-                                                                  border: Border
-                                                                      .all(
-                                                                    color: Color(
-                                                                        0x80000000),
-                                                                  ),
-                                                                ),
-                                                                child: Align(
-                                                                  alignment:
-                                                                      AlignmentDirectional(
-                                                                          0.0,
-                                                                          0.0),
-                                                                  child: Text(
-                                                                    '중4',
-                                                                    style: FlutterFlowTheme.of(
-                                                                            context)
-                                                                        .bodyMedium
-                                                                        .override(
-                                                                          fontFamily:
-                                                                              'Inter',
-                                                                          fontSize:
-                                                                              23.0,
-                                                                          letterSpacing:
-                                                                              0.0,
-                                                                          fontWeight:
-                                                                              FontWeight.w600,
-                                                                        ),
-                                                                  ),
-                                                                ),
-                                                              ),
-                                                              Container(
-                                                                width: MediaQuery.sizeOf(
-                                                                            context)
-                                                                        .width *
-                                                                    0.07,
-                                                                height: MediaQuery.sizeOf(
-                                                                            context)
-                                                                        .height *
-                                                                    0.04,
-                                                                decoration:
-                                                                    BoxDecoration(
-                                                                  color: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .secondaryBackground,
-                                                                  border: Border
-                                                                      .all(
-                                                                    color: Color(
-                                                                        0x80000000),
-                                                                  ),
-                                                                ),
-                                                                child: Align(
-                                                                  alignment:
-                                                                      AlignmentDirectional(
-                                                                          0.0,
-                                                                          0.0),
-                                                                  child: Text(
-                                                                    '종4',
-                                                                    style: FlutterFlowTheme.of(
-                                                                            context)
-                                                                        .bodyMedium
-                                                                        .override(
-                                                                          fontFamily:
-                                                                              'Inter',
-                                                                          fontSize:
-                                                                              23.0,
-                                                                          letterSpacing:
-                                                                              0.0,
-                                                                          fontWeight:
-                                                                              FontWeight.w600,
-                                                                        ),
-                                                                  ),
-                                                                ),
-                                                              ),
-                                                              Container(
-                                                                width: MediaQuery.sizeOf(
-                                                                            context)
-                                                                        .width *
-                                                                    0.07,
-                                                                height: MediaQuery.sizeOf(
-                                                                            context)
-                                                                        .height *
-                                                                    0.04,
-                                                                decoration:
-                                                                    BoxDecoration(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x66B6B6B6),
                                                                   border: Border
                                                                       .all(
-                                                                    color: Color(
+                                                                    color: const Color(
                                                                         0x80000000),
                                                                     width: 1.0,
                                                                   ),
                                                                 ),
                                                                 child: Align(
                                                                   alignment:
-                                                                      AlignmentDirectional(
+                                                                      const AlignmentDirectional(
                                                                           0.0,
                                                                           0.0),
                                                                   child: Text(
@@ -2659,17 +2454,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     0.04,
                                                                 decoration:
                                                                     BoxDecoration(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x3308018C),
                                                                   border: Border
                                                                       .all(
-                                                                    color: Color(
+                                                                    color: const Color(
                                                                         0x80000000),
                                                                   ),
                                                                 ),
                                                                 child: Align(
                                                                   alignment:
-                                                                      AlignmentDirectional(
+                                                                      const AlignmentDirectional(
                                                                           0.0,
                                                                           0.0),
                                                                   child: Text(
@@ -2690,6 +2485,9 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   ),
                                                                 ),
                                                               ),
+                                                              IndexedText(),
+                                                              IndexedText(),
+                                                              IndexedText(),
                                                               Container(
                                                                 width: MediaQuery.sizeOf(
                                                                             context)
@@ -2701,147 +2499,18 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     0.04,
                                                                 decoration:
                                                                     BoxDecoration(
-                                                                  color: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .secondaryBackground,
-                                                                  border: Border
-                                                                      .all(
-                                                                    color: Color(
-                                                                        0x80000000),
-                                                                  ),
-                                                                ),
-                                                                child: Align(
-                                                                  alignment:
-                                                                      AlignmentDirectional(
-                                                                          0.0,
-                                                                          0.0),
-                                                                  child: Text(
-                                                                    '초5',
-                                                                    style: FlutterFlowTheme.of(
-                                                                            context)
-                                                                        .bodyMedium
-                                                                        .override(
-                                                                          fontFamily:
-                                                                              'Inter',
-                                                                          fontSize:
-                                                                              23.0,
-                                                                          letterSpacing:
-                                                                              0.0,
-                                                                          fontWeight:
-                                                                              FontWeight.w600,
-                                                                        ),
-                                                                  ),
-                                                                ),
-                                                              ),
-                                                              Container(
-                                                                width: MediaQuery.sizeOf(
-                                                                            context)
-                                                                        .width *
-                                                                    0.07,
-                                                                height: MediaQuery.sizeOf(
-                                                                            context)
-                                                                        .height *
-                                                                    0.04,
-                                                                decoration:
-                                                                    BoxDecoration(
-                                                                  color: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .secondaryBackground,
-                                                                  border: Border
-                                                                      .all(
-                                                                    color: Color(
-                                                                        0x80000000),
-                                                                  ),
-                                                                ),
-                                                                child: Align(
-                                                                  alignment:
-                                                                      AlignmentDirectional(
-                                                                          0.0,
-                                                                          0.0),
-                                                                  child: Text(
-                                                                    '중5',
-                                                                    style: FlutterFlowTheme.of(
-                                                                            context)
-                                                                        .bodyMedium
-                                                                        .override(
-                                                                          fontFamily:
-                                                                              'Inter',
-                                                                          fontSize:
-                                                                              23.0,
-                                                                          letterSpacing:
-                                                                              0.0,
-                                                                          fontWeight:
-                                                                              FontWeight.w600,
-                                                                        ),
-                                                                  ),
-                                                                ),
-                                                              ),
-                                                              Container(
-                                                                width: MediaQuery.sizeOf(
-                                                                            context)
-                                                                        .width *
-                                                                    0.07,
-                                                                height: MediaQuery.sizeOf(
-                                                                            context)
-                                                                        .height *
-                                                                    0.04,
-                                                                decoration:
-                                                                    BoxDecoration(
-                                                                  color: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .secondaryBackground,
-                                                                  border: Border
-                                                                      .all(
-                                                                    color: Color(
-                                                                        0x80000000),
-                                                                  ),
-                                                                ),
-                                                                child: Align(
-                                                                  alignment:
-                                                                      AlignmentDirectional(
-                                                                          0.0,
-                                                                          0.0),
-                                                                  child: Text(
-                                                                    '종5',
-                                                                    style: FlutterFlowTheme.of(
-                                                                            context)
-                                                                        .bodyMedium
-                                                                        .override(
-                                                                          fontFamily:
-                                                                              'Inter',
-                                                                          fontSize:
-                                                                              23.0,
-                                                                          letterSpacing:
-                                                                              0.0,
-                                                                          fontWeight:
-                                                                              FontWeight.w600,
-                                                                        ),
-                                                                  ),
-                                                                ),
-                                                              ),
-                                                              Container(
-                                                                width: MediaQuery.sizeOf(
-                                                                            context)
-                                                                        .width *
-                                                                    0.07,
-                                                                height: MediaQuery.sizeOf(
-                                                                            context)
-                                                                        .height *
-                                                                    0.04,
-                                                                decoration:
-                                                                    BoxDecoration(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x66B6B6B6),
                                                                   border: Border
                                                                       .all(
-                                                                    color: Color(
+                                                                    color: const Color(
                                                                         0x80000000),
                                                                     width: 1.0,
                                                                   ),
                                                                 ),
                                                                 child: Align(
                                                                   alignment:
-                                                                      AlignmentDirectional(
+                                                                      const AlignmentDirectional(
                                                                           0.0,
                                                                           0.0),
                                                                   child: Text(
@@ -2880,17 +2549,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     0.04,
                                                                 decoration:
                                                                     BoxDecoration(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x3308018C),
                                                                   border: Border
                                                                       .all(
-                                                                    color: Color(
+                                                                    color: const Color(
                                                                         0x80000000),
                                                                   ),
                                                                 ),
                                                                 child: Align(
                                                                   alignment:
-                                                                      AlignmentDirectional(
+                                                                      const AlignmentDirectional(
                                                                           0.0,
                                                                           0.0),
                                                                   child: Text(
@@ -2911,6 +2580,9 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   ),
                                                                 ),
                                                               ),
+                                                              IndexedText(),
+                                                              IndexedText(),
+                                                              IndexedText(),
                                                               Container(
                                                                 width: MediaQuery.sizeOf(
                                                                             context)
@@ -2922,147 +2594,18 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     0.04,
                                                                 decoration:
                                                                     BoxDecoration(
-                                                                  color: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .secondaryBackground,
-                                                                  border: Border
-                                                                      .all(
-                                                                    color: Color(
-                                                                        0x80000000),
-                                                                  ),
-                                                                ),
-                                                                child: Align(
-                                                                  alignment:
-                                                                      AlignmentDirectional(
-                                                                          0.0,
-                                                                          0.0),
-                                                                  child: Text(
-                                                                    '초5',
-                                                                    style: FlutterFlowTheme.of(
-                                                                            context)
-                                                                        .bodyMedium
-                                                                        .override(
-                                                                          fontFamily:
-                                                                              'Inter',
-                                                                          fontSize:
-                                                                              23.0,
-                                                                          letterSpacing:
-                                                                              0.0,
-                                                                          fontWeight:
-                                                                              FontWeight.w600,
-                                                                        ),
-                                                                  ),
-                                                                ),
-                                                              ),
-                                                              Container(
-                                                                width: MediaQuery.sizeOf(
-                                                                            context)
-                                                                        .width *
-                                                                    0.07,
-                                                                height: MediaQuery.sizeOf(
-                                                                            context)
-                                                                        .height *
-                                                                    0.04,
-                                                                decoration:
-                                                                    BoxDecoration(
-                                                                  color: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .secondaryBackground,
-                                                                  border: Border
-                                                                      .all(
-                                                                    color: Color(
-                                                                        0x80000000),
-                                                                  ),
-                                                                ),
-                                                                child: Align(
-                                                                  alignment:
-                                                                      AlignmentDirectional(
-                                                                          0.0,
-                                                                          0.0),
-                                                                  child: Text(
-                                                                    '중6',
-                                                                    style: FlutterFlowTheme.of(
-                                                                            context)
-                                                                        .bodyMedium
-                                                                        .override(
-                                                                          fontFamily:
-                                                                              'Inter',
-                                                                          fontSize:
-                                                                              23.0,
-                                                                          letterSpacing:
-                                                                              0.0,
-                                                                          fontWeight:
-                                                                              FontWeight.w600,
-                                                                        ),
-                                                                  ),
-                                                                ),
-                                                              ),
-                                                              Container(
-                                                                width: MediaQuery.sizeOf(
-                                                                            context)
-                                                                        .width *
-                                                                    0.07,
-                                                                height: MediaQuery.sizeOf(
-                                                                            context)
-                                                                        .height *
-                                                                    0.04,
-                                                                decoration:
-                                                                    BoxDecoration(
-                                                                  color: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .secondaryBackground,
-                                                                  border: Border
-                                                                      .all(
-                                                                    color: Color(
-                                                                        0x80000000),
-                                                                  ),
-                                                                ),
-                                                                child: Align(
-                                                                  alignment:
-                                                                      AlignmentDirectional(
-                                                                          0.0,
-                                                                          0.0),
-                                                                  child: Text(
-                                                                    '종6',
-                                                                    style: FlutterFlowTheme.of(
-                                                                            context)
-                                                                        .bodyMedium
-                                                                        .override(
-                                                                          fontFamily:
-                                                                              'Inter',
-                                                                          fontSize:
-                                                                              23.0,
-                                                                          letterSpacing:
-                                                                              0.0,
-                                                                          fontWeight:
-                                                                              FontWeight.w600,
-                                                                        ),
-                                                                  ),
-                                                                ),
-                                                              ),
-                                                              Container(
-                                                                width: MediaQuery.sizeOf(
-                                                                            context)
-                                                                        .width *
-                                                                    0.07,
-                                                                height: MediaQuery.sizeOf(
-                                                                            context)
-                                                                        .height *
-                                                                    0.04,
-                                                                decoration:
-                                                                    BoxDecoration(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x66B6B6B6),
                                                                   border: Border
                                                                       .all(
-                                                                    color: Color(
+                                                                    color: const Color(
                                                                         0x80000000),
                                                                     width: 1.0,
                                                                   ),
                                                                 ),
                                                                 child: Align(
                                                                   alignment:
-                                                                      AlignmentDirectional(
+                                                                      const AlignmentDirectional(
                                                                           0.0,
                                                                           0.0),
                                                                   child: Text(
@@ -3101,17 +2644,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     0.045,
                                                                 decoration:
                                                                     BoxDecoration(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0xFF08018C),
                                                                   border: Border
                                                                       .all(
-                                                                    color: Color(
+                                                                    color: const Color(
                                                                         0x80000000),
                                                                   ),
                                                                 ),
                                                                 child: Align(
                                                                   alignment:
-                                                                      AlignmentDirectional(
+                                                                      const AlignmentDirectional(
                                                                           0.0,
                                                                           0.0),
                                                                   child: Text(
@@ -3150,18 +2693,18 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                       .secondaryBackground,
                                                                   border: Border
                                                                       .all(
-                                                                    color: Color(
+                                                                    color: const Color(
                                                                         0x80000000),
                                                                   ),
                                                                 ),
                                                                 child: Align(
                                                                   alignment:
-                                                                      AlignmentDirectional(
+                                                                      const AlignmentDirectional(
                                                                           -1.0,
                                                                           0.0),
                                                                   child:
                                                                       Padding(
-                                                                    padding: EdgeInsetsDirectional
+                                                                    padding: const EdgeInsetsDirectional
                                                                         .fromSTEB(
                                                                             8.0,
                                                                             0.0,
@@ -3205,18 +2748,18 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                       .secondaryBackground,
                                                                   border: Border
                                                                       .all(
-                                                                    color: Color(
+                                                                    color: const Color(
                                                                         0x80000000),
                                                                   ),
                                                                 ),
                                                                 child: Align(
                                                                   alignment:
-                                                                      AlignmentDirectional(
+                                                                      const AlignmentDirectional(
                                                                           -1.0,
                                                                           0.0),
                                                                   child:
                                                                       Padding(
-                                                                    padding: EdgeInsetsDirectional
+                                                                    padding: const EdgeInsetsDirectional
                                                                         .fromSTEB(
                                                                             8.0,
                                                                             0.0,
@@ -3248,58 +2791,9 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                     ),
                                                   ),
                                                 ),
-                                                Align(
-                                                  alignment:
-                                                      AlignmentDirectional(
-                                                          0.0, 0.0),
-                                                  child: Padding(
-                                                    padding:
-                                                        EdgeInsetsDirectional
-                                                            .fromSTEB(4.0, 0.0,
-                                                                0.0, 16.0),
-                                                    child: InkWell(
-                                                      splashColor:
-                                                          Colors.transparent,
-                                                      focusColor:
-                                                          Colors.transparent,
-                                                      hoverColor:
-                                                          Colors.transparent,
-                                                      highlightColor:
-                                                          Colors.transparent,
-                                                      onTap: () async {
-                                                        await showDialog(
-                                                          context: context,
-                                                          builder:
-                                                              (alertDialogContext) {
-                                                            return AlertDialog(
-                                                              title: Text('알림'),
-                                                              content: Text(
-                                                                  '엑셀파일로 저장되었습니다.'),
-                                                              actions: [
-                                                                TextButton(
-                                                                  onPressed: () =>
-                                                                      Navigator.pop(
-                                                                          alertDialogContext),
-                                                                  child: Text(
-                                                                      'Ok'),
-                                                                ),
-                                                              ],
-                                                            );
-                                                          },
-                                                        );
-                                                      },
-                                                      child: Icon(
-                                                        Icons
-                                                            .file_download_outlined,
-                                                        color:
-                                                            Color(0xFF08018C),
-                                                        size: 40.0,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
+                                                const DownloadButton()
                                               ].addToStart(
-                                                  SizedBox(width: 40.0)),
+                                                  const SizedBox(width: 40.0)),
                                             ),
                                           ],
                                         ),
@@ -3324,7 +2818,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                           .secondaryBackground,
                                     ),
                                     child: Align(
-                                      alignment: AlignmentDirectional(0.0, 0.0),
+                                      alignment: const AlignmentDirectional(0.0, 0.0),
                                       child: Row(
                                         mainAxisSize: MainAxisSize.max,
                                         mainAxisAlignment:
@@ -3334,7 +2828,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                         children: [
                                           Padding(
                                             padding:
-                                                EdgeInsetsDirectional.fromSTEB(
+                                                const EdgeInsetsDirectional.fromSTEB(
                                                     24.0, 0.0, 0.0, 0.0),
                                             child: Container(
                                               width: MediaQuery.sizeOf(context)
@@ -3346,7 +2840,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                     FlutterFlowTheme.of(context)
                                                         .secondaryBackground,
                                                 border: Border.all(
-                                                  color: Color(0x00FFFFFF),
+                                                  color: const Color(0x00FFFFFF),
                                                 ),
                                               ),
                                               child: Row(
@@ -3354,7 +2848,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                 children: [
                                                   Padding(
                                                     padding:
-                                                        EdgeInsetsDirectional
+                                                        const EdgeInsetsDirectional
                                                             .fromSTEB(4.0, 4.0,
                                                                 4.0, 4.0),
                                                     child: ClipRRect(
@@ -3374,7 +2868,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                   ),
                                                   Padding(
                                                     padding:
-                                                        EdgeInsetsDirectional
+                                                        const EdgeInsetsDirectional
                                                             .fromSTEB(8.0, 0.0,
                                                                 0.0, 0.0),
                                                     child: Text(
@@ -3399,7 +2893,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                           ),
                                           Align(
                                             alignment:
-                                                AlignmentDirectional(0.0, 0.0),
+                                                const AlignmentDirectional(0.0, 0.0),
                                             child: Container(
                                               width: MediaQuery.sizeOf(context)
                                                       .width *
@@ -3416,7 +2910,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                   width: 0.0,
                                                 ),
                                               ),
-                                              alignment: AlignmentDirectional(
+                                              alignment: const AlignmentDirectional(
                                                   0.0, 0.0),
                                               child: Column(
                                                 mainAxisSize: MainAxisSize.max,
@@ -3439,15 +2933,15 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                         decoration:
                                                             BoxDecoration(
                                                           color:
-                                                              Color(0x32B6B6B6),
+                                                              const Color(0x32B6B6B6),
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             '차종(모델)',
@@ -3489,13 +2983,13 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   .of(context)
                                                               .secondaryBackground,
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             'Aurora1',
@@ -3532,15 +3026,15 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                         decoration:
                                                             BoxDecoration(
                                                           color:
-                                                              Color(0x32B6B6B6),
+                                                              const Color(0x32B6B6B6),
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             '공정명',
@@ -3582,13 +3076,13 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   .of(context)
                                                               .secondaryBackground,
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             'Φ8 SUS304\nmale tube 성형',
@@ -3631,15 +3125,15 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                         decoration:
                                                             BoxDecoration(
                                                           color:
-                                                              Color(0x32B6B6B6),
+                                                              const Color(0x32B6B6B6),
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             '품번',
@@ -3679,13 +3173,13 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   .of(context)
                                                               .secondaryBackground,
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             '6608076696/8891471700',
@@ -3722,15 +3216,15 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                         decoration:
                                                             BoxDecoration(
                                                           color:
-                                                              Color(0x32B6B6B6),
+                                                              const Color(0x32B6B6B6),
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             '특별특성',
@@ -3772,13 +3266,13 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   .of(context)
                                                               .secondaryBackground,
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: ClipRRect(
                                                             borderRadius:
@@ -3815,15 +3309,15 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                         decoration:
                                                             BoxDecoration(
                                                           color:
-                                                              Color(0x32B6B6B6),
+                                                              const Color(0x32B6B6B6),
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             '구분',
@@ -3865,13 +3359,13 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   .of(context)
                                                               .secondaryBackground,
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Padding(
                                                           padding:
-                                                              EdgeInsetsDirectional
+                                                              const EdgeInsetsDirectional
                                                                   .fromSTEB(
                                                                       0.0,
                                                                       0.0,
@@ -3887,11 +3381,11 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                             children: [
                                                               Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: EdgeInsetsDirectional
+                                                                  padding: const EdgeInsetsDirectional
                                                                       .fromSTEB(
                                                                           4.0,
                                                                           0.0,
@@ -3906,7 +3400,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                             .height *
                                                                         0.013,
                                                                     decoration:
-                                                                        BoxDecoration(
+                                                                        const BoxDecoration(
                                                                       color: Colors
                                                                           .black,
                                                                     ),
@@ -3932,11 +3426,11 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                               ),
                                                               Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: EdgeInsetsDirectional
+                                                                  padding: const EdgeInsetsDirectional
                                                                       .fromSTEB(
                                                                           12.0,
                                                                           0.0,
@@ -3983,11 +3477,11 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                               ),
                                                               Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: EdgeInsetsDirectional
+                                                                  padding: const EdgeInsetsDirectional
                                                                       .fromSTEB(
                                                                           12.0,
                                                                           0.0,
@@ -4034,11 +3528,11 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                               ),
                                                               Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: EdgeInsetsDirectional
+                                                                  padding: const EdgeInsetsDirectional
                                                                       .fromSTEB(
                                                                           12.0,
                                                                           0.0,
@@ -4101,15 +3595,15 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                         decoration:
                                                             BoxDecoration(
                                                           color:
-                                                              Color(0x32B6B6B6),
+                                                              const Color(0x32B6B6B6),
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             '관리번호',
@@ -4151,13 +3645,13 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   .of(context)
                                                               .secondaryBackground,
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             'MS-011',
@@ -4202,7 +3696,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                               CrossAxisAlignment.center,
                                           children: [
                                             Align(
-                                              alignment: AlignmentDirectional(
+                                              alignment: const AlignmentDirectional(
                                                   0.0, 0.0),
                                               child: Container(
                                                 width:
@@ -4222,7 +3716,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                   ),
                                                 ),
                                                 child: Padding(
-                                                  padding: EdgeInsetsDirectional
+                                                  padding: const EdgeInsetsDirectional
                                                       .fromSTEB(
                                                           8.0, 8.0, 8.0, 8.0),
                                                   child: ClipRRect(
@@ -4240,10 +3734,10 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                               ),
                                             ),
                                             Align(
-                                              alignment: AlignmentDirectional(
+                                              alignment: const AlignmentDirectional(
                                                   0.0, 0.0),
                                               child: Padding(
-                                                padding: EdgeInsetsDirectional
+                                                padding: const EdgeInsetsDirectional
                                                     .fromSTEB(
                                                         0.0, 8.0, 0.0, 0.0),
                                                 child: Container(
@@ -4265,7 +3759,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                     ),
                                                   ),
                                                   alignment:
-                                                      AlignmentDirectional(
+                                                      const AlignmentDirectional(
                                                           0.0, 0.0),
                                                   child: ClipRRect(
                                                     borderRadius:
@@ -4288,10 +3782,10 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                               ),
                                             ),
                                             Align(
-                                              alignment: AlignmentDirectional(
+                                              alignment: const AlignmentDirectional(
                                                   0.0, 1.0),
                                               child: Padding(
-                                                padding: EdgeInsetsDirectional
+                                                padding: const EdgeInsetsDirectional
                                                     .fromSTEB(
                                                         0.0, 8.0, 0.0, 0.0),
                                                 child: Container(
@@ -4313,7 +3807,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                   ),
                                                   child: Padding(
                                                     padding:
-                                                        EdgeInsetsDirectional
+                                                        const EdgeInsetsDirectional
                                                             .fromSTEB(16.0, 4.0,
                                                                 16.0, 0.0),
                                                     child: Text(
@@ -4345,20 +3839,52 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                               CrossAxisAlignment.center,
                                           children: [
                                             Align(
-                                              alignment: AlignmentDirectional(
+                                              alignment: const AlignmentDirectional(
                                                   0.0, 0.0),
                                               child: Row(
                                                 mainAxisSize: MainAxisSize.max,
                                                 mainAxisAlignment:
                                                     MainAxisAlignment.center,
                                                 children: [
+                                                  Padding(
+                                                    padding:
+                                                        const EdgeInsetsDirectional
+                                                            .fromSTEB(0.0, 0.0,
+                                                                16.0, 0.0),
+                                                    child: InkWell(
+                                                      splashColor:
+                                                          Colors.transparent,
+                                                      focusColor:
+                                                          Colors.transparent,
+                                                      hoverColor:
+                                                          Colors.transparent,
+                                                      highlightColor:
+                                                          Colors.transparent,
+                                                      onTap: () async {
+                                                        FFAppState()
+                                                                .CurrentDate =
+                                                            FFAppState().updateDate(
+                                                                FFAppState()
+                                                                    .CurrentDate,
+                                                                -1)!;
+                                                        safeSetState(() {});
+                                                      },
+                                                      child: const FaIcon(
+                                                        FontAwesomeIcons
+                                                            .caretLeft,
+                                                        color:
+                                                            Color(0xFF08018C),
+                                                        size: 40.0,
+                                                      ),
+                                                    ),
+                                                  ),
                                                   Align(
                                                     alignment:
-                                                        AlignmentDirectional(
+                                                        const AlignmentDirectional(
                                                             0.0, 0.0),
                                                     child: Padding(
                                                       padding:
-                                                          EdgeInsetsDirectional
+                                                          const EdgeInsetsDirectional
                                                               .fromSTEB(
                                                                   0.0,
                                                                   0.0,
@@ -4386,20 +3912,10 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                   ),
                                                   Align(
                                                     alignment:
-                                                        AlignmentDirectional(
+                                                        const AlignmentDirectional(
                                                             0.0, 0.0),
                                                     child: Text(
-                                                      valueOrDefault<String>(
-                                                        dateTimeFormat(
-                                                          "yyyy-MM-dd",
-                                                          _model.datePicked2,
-                                                          locale:
-                                                              FFLocalizations.of(
-                                                                      context)
-                                                                  .languageCode,
-                                                        ),
-                                                        'DateTime.now()',
-                                                      ),
+                                                      FFAppState().CurrentDate,
                                                       textAlign:
                                                           TextAlign.center,
                                                       style: FlutterFlowTheme
@@ -4416,7 +3932,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                   ),
                                                   Padding(
                                                     padding:
-                                                        EdgeInsetsDirectional
+                                                        const EdgeInsetsDirectional
                                                             .fromSTEB(16.0, 0.0,
                                                                 0.0, 0.0),
                                                     child: InkWell(
@@ -4429,11 +3945,12 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                       highlightColor:
                                                           Colors.transparent,
                                                       onTap: () async {
-                                                        final _datePicked2Date =
+                                                        final _datePicked1Date =
                                                             await showDatePicker(
                                                           context: context,
-                                                          initialDate:
-                                                              getCurrentTimestamp,
+                                                          initialDate: DateTime
+                                                              .parse(FFAppState()
+                                                                  .CurrentDate),
                                                           firstDate:
                                                               DateTime(1900),
                                                           lastDate:
@@ -4444,7 +3961,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                               context,
                                                               child!,
                                                               headerBackgroundColor:
-                                                                  Color(
+                                                                  const Color(
                                                                       0xFF08018C),
                                                               headerForegroundColor:
                                                                   FlutterFlowTheme.of(
@@ -4473,7 +3990,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                           context)
                                                                       .primaryText,
                                                               selectedDateTimeBackgroundColor:
-                                                                  Color(
+                                                                  const Color(
                                                                       0xFF08018C),
                                                               selectedDateTimeForegroundColor:
                                                                   FlutterFlowTheme.of(
@@ -4488,22 +4005,40 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                           },
                                                         );
 
-                                                        if (_datePicked2Date !=
+                                                        if (_datePicked1Date !=
                                                             null) {
                                                           safeSetState(() {
-                                                            _model.datePicked2 =
-                                                                DateTime(
-                                                              _datePicked2Date
-                                                                  .year,
-                                                              _datePicked2Date
-                                                                  .month,
-                                                              _datePicked2Date
-                                                                  .day,
-                                                            );
+                                                            if (_datePicked1Date
+                                                                    .month <
+                                                                10) {
+                                                              if (_datePicked1Date
+                                                                      .day <
+                                                                  10) {
+                                                                FFAppState()
+                                                                        .CurrentDate =
+                                                                    "${_datePicked1Date.year}-0${_datePicked1Date.month}-0${_datePicked1Date.day}";
+                                                              } else {
+                                                                FFAppState()
+                                                                        .CurrentDate =
+                                                                    "${_datePicked1Date.year}-0${_datePicked1Date.month}-${_datePicked1Date.day}";
+                                                              }
+                                                            } else {
+                                                              if (_datePicked1Date
+                                                                      .day <
+                                                                  10) {
+                                                                FFAppState()
+                                                                        .CurrentDate =
+                                                                    "${_datePicked1Date.year}-${_datePicked1Date.month}-0${_datePicked1Date.day}";
+                                                              } else {
+                                                                FFAppState()
+                                                                        .CurrentDate =
+                                                                    "${_datePicked1Date.year}-${_datePicked1Date.month}-${_datePicked1Date.day}";
+                                                              }
+                                                            }
                                                           });
                                                         }
                                                       },
-                                                      child: Icon(
+                                                      child: const Icon(
                                                         Icons.calendar_month,
                                                         color:
                                                             Color(0xFF08018C),
@@ -4511,8 +4046,40 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                       ),
                                                     ),
                                                   ),
+                                                  Padding(
+                                                    padding:
+                                                        const EdgeInsetsDirectional
+                                                            .fromSTEB(16.0, 0.0,
+                                                                0.0, 0.0),
+                                                    child: InkWell(
+                                                      splashColor:
+                                                          Colors.transparent,
+                                                      focusColor:
+                                                          Colors.transparent,
+                                                      hoverColor:
+                                                          Colors.transparent,
+                                                      highlightColor:
+                                                          Colors.transparent,
+                                                      onTap: () async {
+                                                        FFAppState()
+                                                                .CurrentDate =
+                                                            FFAppState().updateDate(
+                                                                FFAppState()
+                                                                    .CurrentDate,
+                                                                1)!;
+                                                        safeSetState(() {});
+                                                      },
+                                                      child: const FaIcon(
+                                                        FontAwesomeIcons
+                                                            .caretRight,
+                                                        color:
+                                                            Color(0xFF08018C),
+                                                        size: 40.0,
+                                                      ),
+                                                    ),
+                                                  ),
                                                 ].addToStart(
-                                                    SizedBox(width: 40.0)),
+                                                    const SizedBox(width: 40.0)),
                                               ),
                                             ),
                                             Container(
@@ -4540,15 +4107,15 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                             .height *
                                                         0.045,
                                                     decoration: BoxDecoration(
-                                                      color: Color(0xFF08018C),
+                                                      color: const Color(0xFF08018C),
                                                       border: Border.all(
                                                         color:
-                                                            Color(0x80000000),
+                                                            const Color(0x80000000),
                                                       ),
                                                     ),
                                                     child: Align(
                                                       alignment:
-                                                          AlignmentDirectional(
+                                                          const AlignmentDirectional(
                                                               0.0, 0.0),
                                                       child: Text(
                                                         '품번',
@@ -4585,12 +4152,12 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                           .secondaryBackground,
                                                       border: Border.all(
                                                         color:
-                                                            Color(0x80000000),
+                                                            const Color(0x80000000),
                                                       ),
                                                     ),
                                                     child: Align(
                                                       alignment:
-                                                          AlignmentDirectional(
+                                                          const AlignmentDirectional(
                                                               0.0, 0.0),
                                                       child: Text(
                                                         '품번 입력',
@@ -4614,7 +4181,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                               ),
                                             ),
                                             Padding(
-                                              padding: EdgeInsetsDirectional
+                                              padding: const EdgeInsetsDirectional
                                                   .fromSTEB(0.0, 8.0, 0.0, 8.0),
                                               child: Container(
                                                 width:
@@ -4634,19 +4201,31 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                   ),
                                                 ),
                                                 child: Padding(
-                                                  padding: EdgeInsetsDirectional
+                                                  padding: const EdgeInsetsDirectional
                                                       .fromSTEB(
                                                           8.0, 8.0, 8.0, 8.0),
                                                   child: ClipRRect(
                                                     borderRadius:
                                                         BorderRadius.circular(
                                                             8.0),
-                                                    child: Image.network(
-                                                      'https://picsum.photos/seed/856/60',
-                                                      width: 200.0,
-                                                      height: 200.0,
-                                                      fit: BoxFit.cover,
-                                                    ),
+                                                    child: receivedImages[_model
+                                                                .tabBarCurrentIndex] !=
+                                                            null
+                                                        ? Image.memory(
+                                                            receivedImages[_model
+                                                                .tabBarCurrentIndex]!,
+                                                            height: 300,
+                                                            width:
+                                                                double.infinity,
+                                                            fit: BoxFit
+                                                                .fitHeight,
+                                                          )
+                                                        : Image.network(
+                                                            'https://picsum.photos/seed/510/60',
+                                                            width: 200.0,
+                                                            height: 200.0,
+                                                            fit: BoxFit.cover,
+                                                          ),
                                                   ),
                                                 ),
                                               ),
@@ -4659,7 +4238,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                   CrossAxisAlignment.end,
                                               children: [
                                                 Padding(
-                                                  padding: EdgeInsetsDirectional
+                                                  padding: const EdgeInsetsDirectional
                                                       .fromSTEB(
                                                           2.0, 2.0, 2.0, 2.0),
                                                   child: Container(
@@ -4701,17 +4280,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0xFF08018C),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -4747,17 +4326,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0xFF08018C),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -4793,17 +4372,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0xFF08018C),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -4839,17 +4418,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0xFF08018C),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -4885,18 +4464,18 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0xFF08018C),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                   width: 2.0,
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -4938,17 +4517,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0x3308018C),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -4969,6 +4548,9 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                 ),
                                                               ),
                                                             ),
+                                                            IndexedText(),
+                                                            IndexedText(),
+                                                            IndexedText(),
                                                             Container(
                                                               width: MediaQuery
                                                                           .sizeOf(
@@ -4982,153 +4564,18 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '초1',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '중1',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '종1',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0x66B6B6B6),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                   width: 1.0,
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -5168,17 +4615,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0x3308018C),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -5199,6 +4646,9 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                 ),
                                                               ),
                                                             ),
+                                                            IndexedText(),
+                                                            IndexedText(),
+                                                            IndexedText(),
                                                             Container(
                                                               width: MediaQuery
                                                                           .sizeOf(
@@ -5212,153 +4662,18 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '초2',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '중2',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '종2',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0x66B6B6B6),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                   width: 1.0,
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -5398,17 +4713,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0x3308018C),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -5447,17 +4762,21 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     .secondaryBackground,
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
-                                                                  '초3',
+                                                                  getValue(
+                                                                      Constants
+                                                                          .names[1],
+                                                                      "3",
+                                                                      0),
                                                                   style: FlutterFlowTheme.of(
                                                                           context)
                                                                       .bodyMedium
@@ -5492,17 +4811,21 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     .secondaryBackground,
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
-                                                                  '중3',
+                                                                  getValue(
+                                                                      Constants
+                                                                          .names[1],
+                                                                      "3",
+                                                                      1),
                                                                   style: FlutterFlowTheme.of(
                                                                           context)
                                                                       .bodyMedium
@@ -5537,17 +4860,21 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     .secondaryBackground,
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
-                                                                  '종3',
+                                                                  getValue(
+                                                                      Constants
+                                                                          .names[1],
+                                                                      "3",
+                                                                      2),
                                                                   style: FlutterFlowTheme.of(
                                                                           context)
                                                                       .bodyMedium
@@ -5577,22 +4904,25 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0x66B6B6B6),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                   width: 1.0,
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
-                                                                  '평균3',
+                                                                  getAverage(
+                                                                      Constants
+                                                                          .names[1],
+                                                                      "3"),
                                                                   style: FlutterFlowTheme.of(
                                                                           context)
                                                                       .bodyMedium
@@ -5628,17 +4958,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0x3308018C),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -5659,6 +4989,9 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                 ),
                                                               ),
                                                             ),
+                                                            IndexedText(),
+                                                            IndexedText(),
+                                                            IndexedText(),
                                                             Container(
                                                               width: MediaQuery
                                                                           .sizeOf(
@@ -5672,153 +5005,18 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '초4',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '중4',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '종4',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0x66B6B6B6),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                   width: 1.0,
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -5858,17 +5056,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0x3308018C),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -5889,6 +5087,9 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                 ),
                                                               ),
                                                             ),
+                                                            IndexedText(),
+                                                            IndexedText(),
+                                                            IndexedText(),
                                                             Container(
                                                               width: MediaQuery
                                                                           .sizeOf(
@@ -5902,153 +5103,18 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '초5',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '중5',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '종5',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0x66B6B6B6),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                   width: 1.0,
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -6088,17 +5154,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0x3308018C),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -6119,6 +5185,9 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                 ),
                                                               ),
                                                             ),
+                                                            IndexedText(),
+                                                            IndexedText(),
+                                                            IndexedText(),
                                                             Container(
                                                               width: MediaQuery
                                                                           .sizeOf(
@@ -6132,153 +5201,18 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '초5',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '중6',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '종6',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0x66B6B6B6),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                   width: 1.0,
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -6318,17 +5252,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.045,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0xFF08018C),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -6369,17 +5303,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     .secondaryBackground,
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         -1.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: EdgeInsetsDirectional
+                                                                  padding: const EdgeInsetsDirectional
                                                                       .fromSTEB(
                                                                           8.0,
                                                                           0.0,
@@ -6425,17 +5359,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     .secondaryBackground,
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         -1.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: EdgeInsetsDirectional
+                                                                  padding: const EdgeInsetsDirectional
                                                                       .fromSTEB(
                                                                           8.0,
                                                                           0.0,
@@ -6466,58 +5400,9 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                     ),
                                                   ),
                                                 ),
-                                                Align(
-                                                  alignment:
-                                                      AlignmentDirectional(
-                                                          0.0, 0.0),
-                                                  child: Padding(
-                                                    padding:
-                                                        EdgeInsetsDirectional
-                                                            .fromSTEB(4.0, 0.0,
-                                                                0.0, 16.0),
-                                                    child: InkWell(
-                                                      splashColor:
-                                                          Colors.transparent,
-                                                      focusColor:
-                                                          Colors.transparent,
-                                                      hoverColor:
-                                                          Colors.transparent,
-                                                      highlightColor:
-                                                          Colors.transparent,
-                                                      onTap: () async {
-                                                        await showDialog(
-                                                          context: context,
-                                                          builder:
-                                                              (alertDialogContext) {
-                                                            return AlertDialog(
-                                                              title: Text('알림'),
-                                                              content: Text(
-                                                                  '엑셀파일로 저장되었습니다.'),
-                                                              actions: [
-                                                                TextButton(
-                                                                  onPressed: () =>
-                                                                      Navigator.pop(
-                                                                          alertDialogContext),
-                                                                  child: Text(
-                                                                      'Ok'),
-                                                                ),
-                                                              ],
-                                                            );
-                                                          },
-                                                        );
-                                                      },
-                                                      child: Icon(
-                                                        Icons
-                                                            .file_download_outlined,
-                                                        color:
-                                                            Color(0xFF08018C),
-                                                        size: 40.0,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
+                                                const DownloadButton()
                                               ].addToStart(
-                                                  SizedBox(width: 40.0)),
+                                                  const SizedBox(width: 40.0)),
                                             ),
                                           ],
                                         ),
@@ -6542,7 +5427,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                           .secondaryBackground,
                                     ),
                                     child: Align(
-                                      alignment: AlignmentDirectional(0.0, 0.0),
+                                      alignment: const AlignmentDirectional(0.0, 0.0),
                                       child: Row(
                                         mainAxisSize: MainAxisSize.max,
                                         mainAxisAlignment:
@@ -6552,7 +5437,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                         children: [
                                           Padding(
                                             padding:
-                                                EdgeInsetsDirectional.fromSTEB(
+                                                const EdgeInsetsDirectional.fromSTEB(
                                                     24.0, 0.0, 0.0, 0.0),
                                             child: Container(
                                               width: MediaQuery.sizeOf(context)
@@ -6564,7 +5449,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                     FlutterFlowTheme.of(context)
                                                         .secondaryBackground,
                                                 border: Border.all(
-                                                  color: Color(0x00FFFFFF),
+                                                  color: const Color(0x00FFFFFF),
                                                 ),
                                               ),
                                               child: Row(
@@ -6572,7 +5457,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                 children: [
                                                   Padding(
                                                     padding:
-                                                        EdgeInsetsDirectional
+                                                        const EdgeInsetsDirectional
                                                             .fromSTEB(4.0, 4.0,
                                                                 4.0, 4.0),
                                                     child: ClipRRect(
@@ -6592,7 +5477,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                   ),
                                                   Padding(
                                                     padding:
-                                                        EdgeInsetsDirectional
+                                                        const EdgeInsetsDirectional
                                                             .fromSTEB(8.0, 0.0,
                                                                 0.0, 0.0),
                                                     child: Text(
@@ -6617,7 +5502,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                           ),
                                           Align(
                                             alignment:
-                                                AlignmentDirectional(0.0, 0.0),
+                                                const AlignmentDirectional(0.0, 0.0),
                                             child: Container(
                                               width: MediaQuery.sizeOf(context)
                                                       .width *
@@ -6634,7 +5519,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                   width: 0.0,
                                                 ),
                                               ),
-                                              alignment: AlignmentDirectional(
+                                              alignment: const AlignmentDirectional(
                                                   0.0, 0.0),
                                               child: Column(
                                                 mainAxisSize: MainAxisSize.max,
@@ -6657,15 +5542,15 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                         decoration:
                                                             BoxDecoration(
                                                           color:
-                                                              Color(0x32B6B6B6),
+                                                              const Color(0x32B6B6B6),
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             '차종(모델)',
@@ -6707,13 +5592,13 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   .of(context)
                                                               .secondaryBackground,
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             'Aurora1',
@@ -6750,15 +5635,15 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                         decoration:
                                                             BoxDecoration(
                                                           color:
-                                                              Color(0x32B6B6B6),
+                                                              const Color(0x32B6B6B6),
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             '공정명',
@@ -6800,13 +5685,13 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   .of(context)
                                                               .secondaryBackground,
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             'Φ8 SUS304 tube\n이중축관성형',
@@ -6849,15 +5734,15 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                         decoration:
                                                             BoxDecoration(
                                                           color:
-                                                              Color(0x32B6B6B6),
+                                                              const Color(0x32B6B6B6),
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             '품번',
@@ -6897,13 +5782,13 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   .of(context)
                                                               .secondaryBackground,
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             '8891471700',
@@ -6940,15 +5825,15 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                         decoration:
                                                             BoxDecoration(
                                                           color:
-                                                              Color(0x32B6B6B6),
+                                                              const Color(0x32B6B6B6),
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             '특별특성',
@@ -6990,13 +5875,13 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   .of(context)
                                                               .secondaryBackground,
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: ClipRRect(
                                                             borderRadius:
@@ -7033,15 +5918,15 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                         decoration:
                                                             BoxDecoration(
                                                           color:
-                                                              Color(0x32B6B6B6),
+                                                              const Color(0x32B6B6B6),
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             '구분',
@@ -7083,13 +5968,13 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   .of(context)
                                                               .secondaryBackground,
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Padding(
                                                           padding:
-                                                              EdgeInsetsDirectional
+                                                              const EdgeInsetsDirectional
                                                                   .fromSTEB(
                                                                       0.0,
                                                                       0.0,
@@ -7105,11 +5990,11 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                             children: [
                                                               Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: EdgeInsetsDirectional
+                                                                  padding: const EdgeInsetsDirectional
                                                                       .fromSTEB(
                                                                           4.0,
                                                                           0.0,
@@ -7124,7 +6009,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                             .height *
                                                                         0.013,
                                                                     decoration:
-                                                                        BoxDecoration(
+                                                                        const BoxDecoration(
                                                                       color: Colors
                                                                           .black,
                                                                     ),
@@ -7150,11 +6035,11 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                               ),
                                                               Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: EdgeInsetsDirectional
+                                                                  padding: const EdgeInsetsDirectional
                                                                       .fromSTEB(
                                                                           12.0,
                                                                           0.0,
@@ -7201,11 +6086,11 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                               ),
                                                               Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: EdgeInsetsDirectional
+                                                                  padding: const EdgeInsetsDirectional
                                                                       .fromSTEB(
                                                                           12.0,
                                                                           0.0,
@@ -7252,11 +6137,11 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                               ),
                                                               Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: EdgeInsetsDirectional
+                                                                  padding: const EdgeInsetsDirectional
                                                                       .fromSTEB(
                                                                           12.0,
                                                                           0.0,
@@ -7319,15 +6204,15 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                         decoration:
                                                             BoxDecoration(
                                                           color:
-                                                              Color(0x32B6B6B6),
+                                                              const Color(0x32B6B6B6),
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             '관리번호',
@@ -7369,13 +6254,13 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   .of(context)
                                                               .secondaryBackground,
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             'MS-012',
@@ -7420,7 +6305,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                               CrossAxisAlignment.center,
                                           children: [
                                             Align(
-                                              alignment: AlignmentDirectional(
+                                              alignment: const AlignmentDirectional(
                                                   0.0, 0.0),
                                               child: Container(
                                                 width:
@@ -7440,7 +6325,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                   ),
                                                 ),
                                                 child: Padding(
-                                                  padding: EdgeInsetsDirectional
+                                                  padding: const EdgeInsetsDirectional
                                                       .fromSTEB(
                                                           8.0, 8.0, 8.0, 8.0),
                                                   child: ClipRRect(
@@ -7458,10 +6343,10 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                               ),
                                             ),
                                             Align(
-                                              alignment: AlignmentDirectional(
+                                              alignment: const AlignmentDirectional(
                                                   0.0, 0.0),
                                               child: Padding(
-                                                padding: EdgeInsetsDirectional
+                                                padding: const EdgeInsetsDirectional
                                                     .fromSTEB(
                                                         0.0, 8.0, 0.0, 0.0),
                                                 child: Container(
@@ -7483,7 +6368,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                     ),
                                                   ),
                                                   alignment:
-                                                      AlignmentDirectional(
+                                                      const AlignmentDirectional(
                                                           0.0, 0.0),
                                                   child: ClipRRect(
                                                     borderRadius:
@@ -7506,10 +6391,10 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                               ),
                                             ),
                                             Align(
-                                              alignment: AlignmentDirectional(
+                                              alignment: const AlignmentDirectional(
                                                   0.0, 1.0),
                                               child: Padding(
-                                                padding: EdgeInsetsDirectional
+                                                padding: const EdgeInsetsDirectional
                                                     .fromSTEB(
                                                         0.0, 8.0, 0.0, 0.0),
                                                 child: Container(
@@ -7531,7 +6416,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                   ),
                                                   child: Padding(
                                                     padding:
-                                                        EdgeInsetsDirectional
+                                                        const EdgeInsetsDirectional
                                                             .fromSTEB(16.0, 4.0,
                                                                 16.0, 0.0),
                                                     child: Text(
@@ -7563,20 +6448,52 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                               CrossAxisAlignment.center,
                                           children: [
                                             Align(
-                                              alignment: AlignmentDirectional(
+                                              alignment: const AlignmentDirectional(
                                                   0.0, 0.0),
                                               child: Row(
                                                 mainAxisSize: MainAxisSize.max,
                                                 mainAxisAlignment:
                                                     MainAxisAlignment.center,
                                                 children: [
+                                                  Padding(
+                                                    padding:
+                                                        const EdgeInsetsDirectional
+                                                            .fromSTEB(0.0, 0.0,
+                                                                16.0, 0.0),
+                                                    child: InkWell(
+                                                      splashColor:
+                                                          Colors.transparent,
+                                                      focusColor:
+                                                          Colors.transparent,
+                                                      hoverColor:
+                                                          Colors.transparent,
+                                                      highlightColor:
+                                                          Colors.transparent,
+                                                      onTap: () async {
+                                                        FFAppState()
+                                                                .CurrentDate =
+                                                            FFAppState().updateDate(
+                                                                FFAppState()
+                                                                    .CurrentDate,
+                                                                -1)!;
+                                                        safeSetState(() {});
+                                                      },
+                                                      child: const FaIcon(
+                                                        FontAwesomeIcons
+                                                            .caretLeft,
+                                                        color:
+                                                            Color(0xFF08018C),
+                                                        size: 40.0,
+                                                      ),
+                                                    ),
+                                                  ),
                                                   Align(
                                                     alignment:
-                                                        AlignmentDirectional(
+                                                        const AlignmentDirectional(
                                                             0.0, 0.0),
                                                     child: Padding(
                                                       padding:
-                                                          EdgeInsetsDirectional
+                                                          const EdgeInsetsDirectional
                                                               .fromSTEB(
                                                                   0.0,
                                                                   0.0,
@@ -7604,20 +6521,10 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                   ),
                                                   Align(
                                                     alignment:
-                                                        AlignmentDirectional(
+                                                        const AlignmentDirectional(
                                                             0.0, 0.0),
                                                     child: Text(
-                                                      valueOrDefault<String>(
-                                                        dateTimeFormat(
-                                                          "yyyy-MM-dd",
-                                                          _model.datePicked2,
-                                                          locale:
-                                                              FFLocalizations.of(
-                                                                      context)
-                                                                  .languageCode,
-                                                        ),
-                                                        'DateTime.now()',
-                                                      ),
+                                                      FFAppState().CurrentDate,
                                                       textAlign:
                                                           TextAlign.center,
                                                       style: FlutterFlowTheme
@@ -7634,7 +6541,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                   ),
                                                   Padding(
                                                     padding:
-                                                        EdgeInsetsDirectional
+                                                        const EdgeInsetsDirectional
                                                             .fromSTEB(16.0, 0.0,
                                                                 0.0, 0.0),
                                                     child: InkWell(
@@ -7647,11 +6554,12 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                       highlightColor:
                                                           Colors.transparent,
                                                       onTap: () async {
-                                                        final _datePicked2Date =
+                                                        final _datePicked1Date =
                                                             await showDatePicker(
                                                           context: context,
-                                                          initialDate:
-                                                              getCurrentTimestamp,
+                                                          initialDate: DateTime
+                                                              .parse(FFAppState()
+                                                                  .CurrentDate),
                                                           firstDate:
                                                               DateTime(1900),
                                                           lastDate:
@@ -7662,7 +6570,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                               context,
                                                               child!,
                                                               headerBackgroundColor:
-                                                                  Color(
+                                                                  const Color(
                                                                       0xFF08018C),
                                                               headerForegroundColor:
                                                                   FlutterFlowTheme.of(
@@ -7691,7 +6599,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                           context)
                                                                       .primaryText,
                                                               selectedDateTimeBackgroundColor:
-                                                                  Color(
+                                                                  const Color(
                                                                       0xFF08018C),
                                                               selectedDateTimeForegroundColor:
                                                                   FlutterFlowTheme.of(
@@ -7706,22 +6614,40 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                           },
                                                         );
 
-                                                        if (_datePicked2Date !=
+                                                        if (_datePicked1Date !=
                                                             null) {
                                                           safeSetState(() {
-                                                            _model.datePicked2 =
-                                                                DateTime(
-                                                              _datePicked2Date
-                                                                  .year,
-                                                              _datePicked2Date
-                                                                  .month,
-                                                              _datePicked2Date
-                                                                  .day,
-                                                            );
+                                                            if (_datePicked1Date
+                                                                    .month <
+                                                                10) {
+                                                              if (_datePicked1Date
+                                                                      .day <
+                                                                  10) {
+                                                                FFAppState()
+                                                                        .CurrentDate =
+                                                                    "${_datePicked1Date.year}-0${_datePicked1Date.month}-0${_datePicked1Date.day}";
+                                                              } else {
+                                                                FFAppState()
+                                                                        .CurrentDate =
+                                                                    "${_datePicked1Date.year}-0${_datePicked1Date.month}-${_datePicked1Date.day}";
+                                                              }
+                                                            } else {
+                                                              if (_datePicked1Date
+                                                                      .day <
+                                                                  10) {
+                                                                FFAppState()
+                                                                        .CurrentDate =
+                                                                    "${_datePicked1Date.year}-${_datePicked1Date.month}-0${_datePicked1Date.day}";
+                                                              } else {
+                                                                FFAppState()
+                                                                        .CurrentDate =
+                                                                    "${_datePicked1Date.year}-${_datePicked1Date.month}-${_datePicked1Date.day}";
+                                                              }
+                                                            }
                                                           });
                                                         }
                                                       },
-                                                      child: Icon(
+                                                      child: const Icon(
                                                         Icons.calendar_month,
                                                         color:
                                                             Color(0xFF08018C),
@@ -7729,8 +6655,40 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                       ),
                                                     ),
                                                   ),
+                                                  Padding(
+                                                    padding:
+                                                        const EdgeInsetsDirectional
+                                                            .fromSTEB(16.0, 0.0,
+                                                                0.0, 0.0),
+                                                    child: InkWell(
+                                                      splashColor:
+                                                          Colors.transparent,
+                                                      focusColor:
+                                                          Colors.transparent,
+                                                      hoverColor:
+                                                          Colors.transparent,
+                                                      highlightColor:
+                                                          Colors.transparent,
+                                                      onTap: () async {
+                                                        FFAppState()
+                                                                .CurrentDate =
+                                                            FFAppState().updateDate(
+                                                                FFAppState()
+                                                                    .CurrentDate,
+                                                                1)!;
+                                                        safeSetState(() {});
+                                                      },
+                                                      child: const FaIcon(
+                                                        FontAwesomeIcons
+                                                            .caretRight,
+                                                        color:
+                                                            Color(0xFF08018C),
+                                                        size: 40.0,
+                                                      ),
+                                                    ),
+                                                  ),
                                                 ].addToStart(
-                                                    SizedBox(width: 40.0)),
+                                                    const SizedBox(width: 40.0)),
                                               ),
                                             ),
                                             Container(
@@ -7758,15 +6716,15 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                             .height *
                                                         0.045,
                                                     decoration: BoxDecoration(
-                                                      color: Color(0xFF08018C),
+                                                      color: const Color(0xFF08018C),
                                                       border: Border.all(
                                                         color:
-                                                            Color(0x80000000),
+                                                            const Color(0x80000000),
                                                       ),
                                                     ),
                                                     child: Align(
                                                       alignment:
-                                                          AlignmentDirectional(
+                                                          const AlignmentDirectional(
                                                               0.0, 0.0),
                                                       child: Text(
                                                         '품번',
@@ -7803,12 +6761,12 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                           .secondaryBackground,
                                                       border: Border.all(
                                                         color:
-                                                            Color(0x80000000),
+                                                            const Color(0x80000000),
                                                       ),
                                                     ),
                                                     child: Align(
                                                       alignment:
-                                                          AlignmentDirectional(
+                                                          const AlignmentDirectional(
                                                               0.0, 0.0),
                                                       child: Text(
                                                         '품번 입력',
@@ -7832,7 +6790,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                               ),
                                             ),
                                             Padding(
-                                              padding: EdgeInsetsDirectional
+                                              padding: const EdgeInsetsDirectional
                                                   .fromSTEB(0.0, 8.0, 0.0, 8.0),
                                               child: Container(
                                                 width:
@@ -7852,25 +6810,37 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                   ),
                                                 ),
                                                 child: Padding(
-                                                  padding: EdgeInsetsDirectional
+                                                  padding: const EdgeInsetsDirectional
                                                       .fromSTEB(
                                                           8.0, 8.0, 8.0, 8.0),
                                                   child: ClipRRect(
                                                     borderRadius:
                                                         BorderRadius.circular(
                                                             8.0),
-                                                    child: Image.network(
-                                                      'https://picsum.photos/seed/856/60',
-                                                      width: 200.0,
-                                                      height: 200.0,
-                                                      fit: BoxFit.cover,
-                                                    ),
+                                                    child: receivedImages[_model
+                                                                .tabBarCurrentIndex] !=
+                                                            null
+                                                        ? Image.memory(
+                                                            receivedImages[_model
+                                                                .tabBarCurrentIndex]!,
+                                                            height: 300,
+                                                            width:
+                                                                double.infinity,
+                                                            fit: BoxFit
+                                                                .fitHeight,
+                                                          )
+                                                        : Image.network(
+                                                            'https://picsum.photos/seed/510/60',
+                                                            width: 200.0,
+                                                            height: 200.0,
+                                                            fit: BoxFit.cover,
+                                                          ),
                                                   ),
                                                 ),
                                               ),
                                             ),
                                             Padding(
-                                              padding: EdgeInsetsDirectional
+                                              padding: const EdgeInsetsDirectional
                                                   .fromSTEB(2.0, 2.0, 2.0, 2.0),
                                               child: Container(
                                                 width:
@@ -7911,16 +6881,16 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                           decoration:
                                                               BoxDecoration(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0xFF08018C),
                                                             border: Border.all(
-                                                              color: Color(
+                                                              color: const Color(
                                                                   0x80000000),
                                                             ),
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     0.0, 0.0),
                                                             child: Text(
                                                               'NO.',
@@ -7956,16 +6926,16 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                           decoration:
                                                               BoxDecoration(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0xFF08018C),
                                                             border: Border.all(
-                                                              color: Color(
+                                                              color: const Color(
                                                                   0x80000000),
                                                             ),
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     0.0, 0.0),
                                                             child: Text(
                                                               '초',
@@ -8001,16 +6971,16 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                           decoration:
                                                               BoxDecoration(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0xFF08018C),
                                                             border: Border.all(
-                                                              color: Color(
+                                                              color: const Color(
                                                                   0x80000000),
                                                             ),
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     0.0, 0.0),
                                                             child: Text(
                                                               '중',
@@ -8046,16 +7016,16 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                           decoration:
                                                               BoxDecoration(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0xFF08018C),
                                                             border: Border.all(
-                                                              color: Color(
+                                                              color: const Color(
                                                                   0x80000000),
                                                             ),
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     0.0, 0.0),
                                                             child: Text(
                                                               '종',
@@ -8091,17 +7061,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                           decoration:
                                                               BoxDecoration(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0xFF08018C),
                                                             border: Border.all(
-                                                              color: Color(
+                                                              color: const Color(
                                                                   0x80000000),
                                                               width: 2.0,
                                                             ),
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     0.0, 0.0),
                                                             child: Text(
                                                               '평균',
@@ -8143,16 +7113,16 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                           decoration:
                                                               BoxDecoration(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x3308018C),
                                                             border: Border.all(
-                                                              color: Color(
+                                                              color: const Color(
                                                                   0x80000000),
                                                             ),
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     0.0, 0.0),
                                                             child: Text(
                                                               '1',
@@ -8173,6 +7143,9 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                             ),
                                                           ),
                                                         ),
+                                                        IndexedText(),
+                                                        IndexedText(),
+                                                        IndexedText(),
                                                         Container(
                                                           width:
                                                               MediaQuery.sizeOf(
@@ -8186,149 +7159,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                           decoration:
                                                               BoxDecoration(
-                                                            color: FlutterFlowTheme
-                                                                    .of(context)
-                                                                .secondaryBackground,
-                                                            border: Border.all(
-                                                              color: Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '초1',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: FlutterFlowTheme
-                                                                    .of(context)
-                                                                .secondaryBackground,
-                                                            border: Border.all(
-                                                              color: Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '중1',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: FlutterFlowTheme
-                                                                    .of(context)
-                                                                .secondaryBackground,
-                                                            border: Border.all(
-                                                              color: Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '종1',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x66B6B6B6),
                                                             border: Border.all(
-                                                              color: Color(
+                                                              color: const Color(
                                                                   0x80000000),
                                                               width: 1.0,
                                                             ),
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     0.0, 0.0),
                                                             child: Text(
                                                               '평균1',
@@ -8368,16 +7209,16 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                           decoration:
                                                               BoxDecoration(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x3308018C),
                                                             border: Border.all(
-                                                              color: Color(
+                                                              color: const Color(
                                                                   0x80000000),
                                                             ),
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     0.0, 0.0),
                                                             child: Text(
                                                               '2',
@@ -8398,6 +7239,9 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                             ),
                                                           ),
                                                         ),
+                                                        IndexedText(),
+                                                        IndexedText(),
+                                                        IndexedText(),
                                                         Container(
                                                           width:
                                                               MediaQuery.sizeOf(
@@ -8411,149 +7255,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                           decoration:
                                                               BoxDecoration(
-                                                            color: FlutterFlowTheme
-                                                                    .of(context)
-                                                                .secondaryBackground,
-                                                            border: Border.all(
-                                                              color: Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '초2',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: FlutterFlowTheme
-                                                                    .of(context)
-                                                                .secondaryBackground,
-                                                            border: Border.all(
-                                                              color: Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '중2',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: FlutterFlowTheme
-                                                                    .of(context)
-                                                                .secondaryBackground,
-                                                            border: Border.all(
-                                                              color: Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '종2',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x66B6B6B6),
                                                             border: Border.all(
-                                                              color: Color(
+                                                              color: const Color(
                                                                   0x80000000),
                                                               width: 1.0,
                                                             ),
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     0.0, 0.0),
                                                             child: Text(
                                                               '평균2',
@@ -8593,16 +7305,16 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                           decoration:
                                                               BoxDecoration(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x3308018C),
                                                             border: Border.all(
-                                                              color: Color(
+                                                              color: const Color(
                                                                   0x80000000),
                                                             ),
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     0.0, 0.0),
                                                             child: Text(
                                                               '3',
@@ -8640,16 +7352,20 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     .of(context)
                                                                 .secondaryBackground,
                                                             border: Border.all(
-                                                              color: Color(
+                                                              color: const Color(
                                                                   0x80000000),
                                                             ),
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     0.0, 0.0),
                                                             child: Text(
-                                                              '초3',
+                                                              getValue(
+                                                                  Constants
+                                                                      .names[2],
+                                                                  "3",
+                                                                  0),
                                                               style: FlutterFlowTheme
                                                                       .of(context)
                                                                   .bodyMedium
@@ -8684,16 +7400,20 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     .of(context)
                                                                 .secondaryBackground,
                                                             border: Border.all(
-                                                              color: Color(
+                                                              color: const Color(
                                                                   0x80000000),
                                                             ),
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     0.0, 0.0),
                                                             child: Text(
-                                                              '중3',
+                                                              getValue(
+                                                                  Constants
+                                                                      .names[2],
+                                                                  "3",
+                                                                  1),
                                                               style: FlutterFlowTheme
                                                                       .of(context)
                                                                   .bodyMedium
@@ -8728,16 +7448,20 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     .of(context)
                                                                 .secondaryBackground,
                                                             border: Border.all(
-                                                              color: Color(
+                                                              color: const Color(
                                                                   0x80000000),
                                                             ),
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     0.0, 0.0),
                                                             child: Text(
-                                                              '종3',
+                                                              getValue(
+                                                                  Constants
+                                                                      .names[2],
+                                                                  "3",
+                                                                  2),
                                                               style: FlutterFlowTheme
                                                                       .of(context)
                                                                   .bodyMedium
@@ -8768,20 +7492,23 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                           decoration:
                                                               BoxDecoration(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x66B6B6B6),
                                                             border: Border.all(
-                                                              color: Color(
+                                                              color: const Color(
                                                                   0x80000000),
                                                               width: 1.0,
                                                             ),
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     0.0, 0.0),
                                                             child: Text(
-                                                              '평균3',
+                                                              getAverage(
+                                                                  Constants
+                                                                      .names[2],
+                                                                  "3"),
                                                               style: FlutterFlowTheme
                                                                       .of(context)
                                                                   .bodyMedium
@@ -8818,16 +7545,16 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                           decoration:
                                                               BoxDecoration(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x3308018C),
                                                             border: Border.all(
-                                                              color: Color(
+                                                              color: const Color(
                                                                   0x80000000),
                                                             ),
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     0.0, 0.0),
                                                             child: Text(
                                                               '4',
@@ -8865,16 +7592,20 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     .of(context)
                                                                 .secondaryBackground,
                                                             border: Border.all(
-                                                              color: Color(
+                                                              color: const Color(
                                                                   0x80000000),
                                                             ),
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     0.0, 0.0),
                                                             child: Text(
-                                                              '초4',
+                                                              getValue(
+                                                                  Constants
+                                                                      .names[2],
+                                                                  "4",
+                                                                  0),
                                                               style: FlutterFlowTheme
                                                                       .of(context)
                                                                   .bodyMedium
@@ -8909,16 +7640,20 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     .of(context)
                                                                 .secondaryBackground,
                                                             border: Border.all(
-                                                              color: Color(
+                                                              color: const Color(
                                                                   0x80000000),
                                                             ),
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     0.0, 0.0),
                                                             child: Text(
-                                                              '중4',
+                                                              getValue(
+                                                                  Constants
+                                                                      .names[2],
+                                                                  "4",
+                                                                  1),
                                                               style: FlutterFlowTheme
                                                                       .of(context)
                                                                   .bodyMedium
@@ -8953,16 +7688,20 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     .of(context)
                                                                 .secondaryBackground,
                                                             border: Border.all(
-                                                              color: Color(
+                                                              color: const Color(
                                                                   0x80000000),
                                                             ),
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     0.0, 0.0),
                                                             child: Text(
-                                                              '종4',
+                                                              getValue(
+                                                                  Constants
+                                                                      .names[2],
+                                                                  "4",
+                                                                  2),
                                                               style: FlutterFlowTheme
                                                                       .of(context)
                                                                   .bodyMedium
@@ -8993,20 +7732,23 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                           decoration:
                                                               BoxDecoration(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x66B6B6B6),
                                                             border: Border.all(
-                                                              color: Color(
+                                                              color: const Color(
                                                                   0x80000000),
                                                               width: 1.0,
                                                             ),
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     0.0, 0.0),
                                                             child: Text(
-                                                              '평균4',
+                                                              getAverage(
+                                                                  Constants
+                                                                      .names[2],
+                                                                  "4"),
                                                               style: FlutterFlowTheme
                                                                       .of(context)
                                                                   .bodyMedium
@@ -9043,16 +7785,16 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                           decoration:
                                                               BoxDecoration(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x3308018C),
                                                             border: Border.all(
-                                                              color: Color(
+                                                              color: const Color(
                                                                   0x80000000),
                                                             ),
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     0.0, 0.0),
                                                             child: Text(
                                                               '5',
@@ -9073,6 +7815,9 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                             ),
                                                           ),
                                                         ),
+                                                        IndexedText(),
+                                                        IndexedText(),
+                                                        IndexedText(),
                                                         Container(
                                                           width:
                                                               MediaQuery.sizeOf(
@@ -9086,149 +7831,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                           decoration:
                                                               BoxDecoration(
-                                                            color: FlutterFlowTheme
-                                                                    .of(context)
-                                                                .secondaryBackground,
-                                                            border: Border.all(
-                                                              color: Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '초5',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: FlutterFlowTheme
-                                                                    .of(context)
-                                                                .secondaryBackground,
-                                                            border: Border.all(
-                                                              color: Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '중5',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: FlutterFlowTheme
-                                                                    .of(context)
-                                                                .secondaryBackground,
-                                                            border: Border.all(
-                                                              color: Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '종5',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x66B6B6B6),
                                                             border: Border.all(
-                                                              color: Color(
+                                                              color: const Color(
                                                                   0x80000000),
                                                               width: 1.0,
                                                             ),
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     0.0, 0.0),
                                                             child: Text(
                                                               '평균5',
@@ -9268,16 +7881,16 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                           decoration:
                                                               BoxDecoration(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x3308018C),
                                                             border: Border.all(
-                                                              color: Color(
+                                                              color: const Color(
                                                                   0x80000000),
                                                             ),
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     0.0, 0.0),
                                                             child: Text(
                                                               '6',
@@ -9298,6 +7911,9 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                             ),
                                                           ),
                                                         ),
+                                                        IndexedText(),
+                                                        IndexedText(),
+                                                        IndexedText(),
                                                         Container(
                                                           width:
                                                               MediaQuery.sizeOf(
@@ -9311,149 +7927,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                           decoration:
                                                               BoxDecoration(
-                                                            color: FlutterFlowTheme
-                                                                    .of(context)
-                                                                .secondaryBackground,
-                                                            border: Border.all(
-                                                              color: Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '초5',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: FlutterFlowTheme
-                                                                    .of(context)
-                                                                .secondaryBackground,
-                                                            border: Border.all(
-                                                              color: Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '중6',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: FlutterFlowTheme
-                                                                    .of(context)
-                                                                .secondaryBackground,
-                                                            border: Border.all(
-                                                              color: Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '종6',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x66B6B6B6),
                                                             border: Border.all(
-                                                              color: Color(
+                                                              color: const Color(
                                                                   0x80000000),
                                                               width: 1.0,
                                                             ),
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     0.0, 0.0),
                                                             child: Text(
                                                               '평균6',
@@ -9493,16 +7977,16 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.045,
                                                           decoration:
                                                               BoxDecoration(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0xFF08018C),
                                                             border: Border.all(
-                                                              color: Color(
+                                                              color: const Color(
                                                                   0x80000000),
                                                             ),
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     0.0, 0.0),
                                                             child: Text(
                                                               '불량',
@@ -9542,17 +8026,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     .of(context)
                                                                 .secondaryBackground,
                                                             border: Border.all(
-                                                              color: Color(
+                                                              color: const Color(
                                                                   0x80000000),
                                                             ),
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     -1.0, 0.0),
                                                             child: Padding(
                                                               padding:
-                                                                  EdgeInsetsDirectional
+                                                                  const EdgeInsetsDirectional
                                                                       .fromSTEB(
                                                                           8.0,
                                                                           0.0,
@@ -9598,17 +8082,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     .of(context)
                                                                 .secondaryBackground,
                                                             border: Border.all(
-                                                              color: Color(
+                                                              color: const Color(
                                                                   0x80000000),
                                                             ),
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     -1.0, 0.0),
                                                             child: Padding(
                                                               padding:
-                                                                  EdgeInsetsDirectional
+                                                                  const EdgeInsetsDirectional
                                                                       .fromSTEB(
                                                                           8.0,
                                                                           0.0,
@@ -9663,7 +8147,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                           .secondaryBackground,
                                     ),
                                     child: Align(
-                                      alignment: AlignmentDirectional(0.0, 0.0),
+                                      alignment: const AlignmentDirectional(0.0, 0.0),
                                       child: Row(
                                         mainAxisSize: MainAxisSize.max,
                                         mainAxisAlignment:
@@ -9673,7 +8157,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                         children: [
                                           Padding(
                                             padding:
-                                                EdgeInsetsDirectional.fromSTEB(
+                                                const EdgeInsetsDirectional.fromSTEB(
                                                     24.0, 0.0, 0.0, 0.0),
                                             child: Container(
                                               width: MediaQuery.sizeOf(context)
@@ -9685,7 +8169,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                     FlutterFlowTheme.of(context)
                                                         .secondaryBackground,
                                                 border: Border.all(
-                                                  color: Color(0x00FFFFFF),
+                                                  color: const Color(0x00FFFFFF),
                                                 ),
                                               ),
                                               child: Row(
@@ -9693,7 +8177,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                 children: [
                                                   Padding(
                                                     padding:
-                                                        EdgeInsetsDirectional
+                                                        const EdgeInsetsDirectional
                                                             .fromSTEB(4.0, 4.0,
                                                                 4.0, 4.0),
                                                     child: ClipRRect(
@@ -9713,7 +8197,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                   ),
                                                   Padding(
                                                     padding:
-                                                        EdgeInsetsDirectional
+                                                        const EdgeInsetsDirectional
                                                             .fromSTEB(8.0, 0.0,
                                                                 0.0, 0.0),
                                                     child: Text(
@@ -9738,7 +8222,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                           ),
                                           Align(
                                             alignment:
-                                                AlignmentDirectional(0.0, 0.0),
+                                                const AlignmentDirectional(0.0, 0.0),
                                             child: Container(
                                               width: MediaQuery.sizeOf(context)
                                                       .width *
@@ -9755,7 +8239,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                   width: 0.0,
                                                 ),
                                               ),
-                                              alignment: AlignmentDirectional(
+                                              alignment: const AlignmentDirectional(
                                                   0.0, 0.0),
                                               child: Column(
                                                 mainAxisSize: MainAxisSize.max,
@@ -9778,15 +8262,15 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                         decoration:
                                                             BoxDecoration(
                                                           color:
-                                                              Color(0x32B6B6B6),
+                                                              const Color(0x32B6B6B6),
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             '차종(모델)',
@@ -9828,13 +8312,13 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   .of(context)
                                                               .secondaryBackground,
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             'Aurora1',
@@ -9871,15 +8355,15 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                         decoration:
                                                             BoxDecoration(
                                                           color:
-                                                              Color(0x32B6B6B6),
+                                                              const Color(0x32B6B6B6),
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             '공정명',
@@ -9921,13 +8405,13 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   .of(context)
                                                               .secondaryBackground,
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             'Φ8 SUS304 tube\n이중축관성형',
@@ -9970,15 +8454,15 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                         decoration:
                                                             BoxDecoration(
                                                           color:
-                                                              Color(0x32B6B6B6),
+                                                              const Color(0x32B6B6B6),
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             '품번',
@@ -10018,13 +8502,13 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   .of(context)
                                                               .secondaryBackground,
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             '8891471700',
@@ -10061,15 +8545,15 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                         decoration:
                                                             BoxDecoration(
                                                           color:
-                                                              Color(0x32B6B6B6),
+                                                              const Color(0x32B6B6B6),
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             '특별특성',
@@ -10111,13 +8595,13 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   .of(context)
                                                               .secondaryBackground,
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: ClipRRect(
                                                             borderRadius:
@@ -10154,15 +8638,15 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                         decoration:
                                                             BoxDecoration(
                                                           color:
-                                                              Color(0x32B6B6B6),
+                                                              const Color(0x32B6B6B6),
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             '구분',
@@ -10204,13 +8688,13 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   .of(context)
                                                               .secondaryBackground,
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Padding(
                                                           padding:
-                                                              EdgeInsetsDirectional
+                                                              const EdgeInsetsDirectional
                                                                   .fromSTEB(
                                                                       0.0,
                                                                       0.0,
@@ -10226,11 +8710,11 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                             children: [
                                                               Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: EdgeInsetsDirectional
+                                                                  padding: const EdgeInsetsDirectional
                                                                       .fromSTEB(
                                                                           4.0,
                                                                           0.0,
@@ -10245,7 +8729,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                             .height *
                                                                         0.013,
                                                                     decoration:
-                                                                        BoxDecoration(
+                                                                        const BoxDecoration(
                                                                       color: Colors
                                                                           .black,
                                                                     ),
@@ -10271,11 +8755,11 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                               ),
                                                               Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: EdgeInsetsDirectional
+                                                                  padding: const EdgeInsetsDirectional
                                                                       .fromSTEB(
                                                                           12.0,
                                                                           0.0,
@@ -10322,11 +8806,11 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                               ),
                                                               Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: EdgeInsetsDirectional
+                                                                  padding: const EdgeInsetsDirectional
                                                                       .fromSTEB(
                                                                           12.0,
                                                                           0.0,
@@ -10373,11 +8857,11 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                               ),
                                                               Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: EdgeInsetsDirectional
+                                                                  padding: const EdgeInsetsDirectional
                                                                       .fromSTEB(
                                                                           12.0,
                                                                           0.0,
@@ -10440,15 +8924,15 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                         decoration:
                                                             BoxDecoration(
                                                           color:
-                                                              Color(0x32B6B6B6),
+                                                              const Color(0x32B6B6B6),
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             '관리번호',
@@ -10490,13 +8974,13 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   .of(context)
                                                               .secondaryBackground,
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             'MS-013',
@@ -10541,7 +9025,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                               CrossAxisAlignment.center,
                                           children: [
                                             Align(
-                                              alignment: AlignmentDirectional(
+                                              alignment: const AlignmentDirectional(
                                                   0.0, 0.0),
                                               child: Container(
                                                 width:
@@ -10561,7 +9045,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                   ),
                                                 ),
                                                 child: Padding(
-                                                  padding: EdgeInsetsDirectional
+                                                  padding: const EdgeInsetsDirectional
                                                       .fromSTEB(
                                                           8.0, 8.0, 8.0, 8.0),
                                                   child: ClipRRect(
@@ -10579,10 +9063,10 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                               ),
                                             ),
                                             Align(
-                                              alignment: AlignmentDirectional(
+                                              alignment: const AlignmentDirectional(
                                                   0.0, 0.0),
                                               child: Padding(
-                                                padding: EdgeInsetsDirectional
+                                                padding: const EdgeInsetsDirectional
                                                     .fromSTEB(
                                                         0.0, 8.0, 0.0, 0.0),
                                                 child: Container(
@@ -10603,7 +9087,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                     ),
                                                   ),
                                                   alignment:
-                                                      AlignmentDirectional(
+                                                      const AlignmentDirectional(
                                                           0.0, 0.0),
                                                   child: ClipRRect(
                                                     borderRadius:
@@ -10626,10 +9110,10 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                               ),
                                             ),
                                             Align(
-                                              alignment: AlignmentDirectional(
+                                              alignment: const AlignmentDirectional(
                                                   0.0, 1.0),
                                               child: Padding(
-                                                padding: EdgeInsetsDirectional
+                                                padding: const EdgeInsetsDirectional
                                                     .fromSTEB(
                                                         0.0, 8.0, 0.0, 0.0),
                                                 child: Container(
@@ -10651,7 +9135,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                   ),
                                                   child: Padding(
                                                     padding:
-                                                        EdgeInsetsDirectional
+                                                        const EdgeInsetsDirectional
                                                             .fromSTEB(16.0, 4.0,
                                                                 16.0, 0.0),
                                                     child: Text(
@@ -10683,7 +9167,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                               CrossAxisAlignment.center,
                                           children: [
                                             Align(
-                                              alignment: AlignmentDirectional(
+                                              alignment: const AlignmentDirectional(
                                                   0.0, 0.0),
                                               child: Row(
                                                 mainAxisSize: MainAxisSize.max,
@@ -10692,7 +9176,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                 children: [
                                                   Padding(
                                                     padding:
-                                                        EdgeInsetsDirectional
+                                                        const EdgeInsetsDirectional
                                                             .fromSTEB(0.0, 0.0,
                                                                 16.0, 0.0),
                                                     child: InkWell(
@@ -10707,13 +9191,13 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                       onTap: () async {
                                                         FFAppState()
                                                                 .CurrentDate =
-                                                            functions.updateDate(
+                                                            FFAppState().updateDate(
                                                                 FFAppState()
                                                                     .CurrentDate,
                                                                 -1)!;
                                                         safeSetState(() {});
                                                       },
-                                                      child: FaIcon(
+                                                      child: const FaIcon(
                                                         FontAwesomeIcons
                                                             .caretLeft,
                                                         color:
@@ -10724,11 +9208,11 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                   ),
                                                   Align(
                                                     alignment:
-                                                        AlignmentDirectional(
+                                                        const AlignmentDirectional(
                                                             0.0, 0.0),
                                                     child: Padding(
                                                       padding:
-                                                          EdgeInsetsDirectional
+                                                          const EdgeInsetsDirectional
                                                               .fromSTEB(
                                                                   0.0,
                                                                   0.0,
@@ -10756,7 +9240,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                   ),
                                                   Align(
                                                     alignment:
-                                                        AlignmentDirectional(
+                                                        const AlignmentDirectional(
                                                             0.0, 0.0),
                                                     child: Text(
                                                       FFAppState().CurrentDate,
@@ -10776,7 +9260,123 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                   ),
                                                   Padding(
                                                     padding:
-                                                        EdgeInsetsDirectional
+                                                        const EdgeInsetsDirectional
+                                                            .fromSTEB(16.0, 0.0,
+                                                                0.0, 0.0),
+                                                    child: InkWell(
+                                                      splashColor:
+                                                          Colors.transparent,
+                                                      focusColor:
+                                                          Colors.transparent,
+                                                      hoverColor:
+                                                          Colors.transparent,
+                                                      highlightColor:
+                                                          Colors.transparent,
+                                                      onTap: () async {
+                                                        final _datePicked1Date =
+                                                            await showDatePicker(
+                                                          context: context,
+                                                          initialDate: DateTime
+                                                              .parse(FFAppState()
+                                                                  .CurrentDate),
+                                                          firstDate:
+                                                              DateTime(1900),
+                                                          lastDate:
+                                                              getCurrentTimestamp,
+                                                          builder:
+                                                              (context, child) {
+                                                            return wrapInMaterialDatePickerTheme(
+                                                              context,
+                                                              child!,
+                                                              headerBackgroundColor:
+                                                                  const Color(
+                                                                      0xFF08018C),
+                                                              headerForegroundColor:
+                                                                  FlutterFlowTheme.of(
+                                                                          context)
+                                                                      .info,
+                                                              headerTextStyle:
+                                                                  FlutterFlowTheme.of(
+                                                                          context)
+                                                                      .headlineLarge
+                                                                      .override(
+                                                                        fontFamily:
+                                                                            'Inter Tight',
+                                                                        fontSize:
+                                                                            32.0,
+                                                                        letterSpacing:
+                                                                            0.0,
+                                                                        fontWeight:
+                                                                            FontWeight.w600,
+                                                                      ),
+                                                              pickerBackgroundColor:
+                                                                  FlutterFlowTheme.of(
+                                                                          context)
+                                                                      .secondaryBackground,
+                                                              pickerForegroundColor:
+                                                                  FlutterFlowTheme.of(
+                                                                          context)
+                                                                      .primaryText,
+                                                              selectedDateTimeBackgroundColor:
+                                                                  const Color(
+                                                                      0xFF08018C),
+                                                              selectedDateTimeForegroundColor:
+                                                                  FlutterFlowTheme.of(
+                                                                          context)
+                                                                      .info,
+                                                              actionButtonForegroundColor:
+                                                                  FlutterFlowTheme.of(
+                                                                          context)
+                                                                      .primaryText,
+                                                              iconSize: 25.0,
+                                                            );
+                                                          },
+                                                        );
+
+                                                        if (_datePicked1Date !=
+                                                            null) {
+                                                          safeSetState(() {
+                                                            if (_datePicked1Date
+                                                                    .month <
+                                                                10) {
+                                                              if (_datePicked1Date
+                                                                      .day <
+                                                                  10) {
+                                                                FFAppState()
+                                                                        .CurrentDate =
+                                                                    "${_datePicked1Date.year}-0${_datePicked1Date.month}-0${_datePicked1Date.day}";
+                                                              } else {
+                                                                FFAppState()
+                                                                        .CurrentDate =
+                                                                    "${_datePicked1Date.year}-0${_datePicked1Date.month}-${_datePicked1Date.day}";
+                                                              }
+                                                            } else {
+                                                              if (_datePicked1Date
+                                                                      .day <
+                                                                  10) {
+                                                                FFAppState()
+                                                                        .CurrentDate =
+                                                                    "${_datePicked1Date.year}-${_datePicked1Date.month}-0${_datePicked1Date.day}";
+                                                              } else {
+                                                                FFAppState()
+                                                                        .CurrentDate =
+                                                                    "${_datePicked1Date.year}-${_datePicked1Date.month}-${_datePicked1Date.day}";
+                                                              }
+                                                            }
+                                                          });
+                                                        }
+                                                      },
+                                                      child: const Icon(
+                                                        Icons.calendar_month,
+                                                        color:
+                                                            Color(0xFF08018C),
+                                                        size: 40.0,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  Padding(
+                                                    padding:
+                                                        const EdgeInsetsDirectional
                                                             .fromSTEB(16.0, 0.0,
                                                                 0.0, 0.0),
                                                     child: InkWell(
@@ -10791,13 +9391,13 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                       onTap: () async {
                                                         FFAppState()
                                                                 .CurrentDate =
-                                                            functions.updateDate(
+                                                            FFAppState().updateDate(
                                                                 FFAppState()
                                                                     .CurrentDate,
                                                                 1)!;
                                                         safeSetState(() {});
                                                       },
-                                                      child: FaIcon(
+                                                      child: const FaIcon(
                                                         FontAwesomeIcons
                                                             .caretRight,
                                                         color:
@@ -10806,7 +9406,8 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                       ),
                                                     ),
                                                   ),
-                                                ],
+                                                ].addToStart(
+                                                    const SizedBox(width: 40.0)),
                                               ),
                                             ),
                                             Container(
@@ -10834,15 +9435,15 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                             .height *
                                                         0.045,
                                                     decoration: BoxDecoration(
-                                                      color: Color(0xFF08018C),
+                                                      color: const Color(0xFF08018C),
                                                       border: Border.all(
                                                         color:
-                                                            Color(0x80000000),
+                                                            const Color(0x80000000),
                                                       ),
                                                     ),
                                                     child: Align(
                                                       alignment:
-                                                          AlignmentDirectional(
+                                                          const AlignmentDirectional(
                                                               0.0, 0.0),
                                                       child: Text(
                                                         '품번',
@@ -10879,12 +9480,12 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                           .secondaryBackground,
                                                       border: Border.all(
                                                         color:
-                                                            Color(0x80000000),
+                                                            const Color(0x80000000),
                                                       ),
                                                     ),
                                                     child: Align(
                                                       alignment:
-                                                          AlignmentDirectional(
+                                                          const AlignmentDirectional(
                                                               0.0, 0.0),
                                                       child: Text(
                                                         '품번 입력',
@@ -10908,7 +9509,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                               ),
                                             ),
                                             Padding(
-                                              padding: EdgeInsetsDirectional
+                                              padding: const EdgeInsetsDirectional
                                                   .fromSTEB(0.0, 8.0, 0.0, 8.0),
                                               child: Container(
                                                 width:
@@ -10928,25 +9529,37 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                   ),
                                                 ),
                                                 child: Padding(
-                                                  padding: EdgeInsetsDirectional
+                                                  padding: const EdgeInsetsDirectional
                                                       .fromSTEB(
                                                           8.0, 8.0, 8.0, 8.0),
                                                   child: ClipRRect(
                                                     borderRadius:
                                                         BorderRadius.circular(
                                                             8.0),
-                                                    child: Image.network(
-                                                      'https://picsum.photos/seed/856/60',
-                                                      width: 200.0,
-                                                      height: 200.0,
-                                                      fit: BoxFit.cover,
-                                                    ),
+                                                    child: receivedImages[_model
+                                                                .tabBarCurrentIndex] !=
+                                                            null
+                                                        ? Image.memory(
+                                                            receivedImages[_model
+                                                                .tabBarCurrentIndex]!,
+                                                            height: 300,
+                                                            width:
+                                                                double.infinity,
+                                                            fit: BoxFit
+                                                                .fitHeight,
+                                                          )
+                                                        : Image.network(
+                                                            'https://picsum.photos/seed/510/60',
+                                                            width: 200.0,
+                                                            height: 200.0,
+                                                            fit: BoxFit.cover,
+                                                          ),
                                                   ),
                                                 ),
                                               ),
                                             ),
                                             Padding(
-                                              padding: EdgeInsetsDirectional
+                                              padding: const EdgeInsetsDirectional
                                                   .fromSTEB(2.0, 2.0, 2.0, 2.0),
                                               child: Container(
                                                 width:
@@ -10987,16 +9600,16 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                           decoration:
                                                               BoxDecoration(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0xFF08018C),
                                                             border: Border.all(
-                                                              color: Color(
+                                                              color: const Color(
                                                                   0x80000000),
                                                             ),
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     0.0, 0.0),
                                                             child: Text(
                                                               'NO.',
@@ -11032,16 +9645,16 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                           decoration:
                                                               BoxDecoration(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0xFF08018C),
                                                             border: Border.all(
-                                                              color: Color(
+                                                              color: const Color(
                                                                   0x80000000),
                                                             ),
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     0.0, 0.0),
                                                             child: Text(
                                                               '초',
@@ -11077,16 +9690,16 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                           decoration:
                                                               BoxDecoration(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0xFF08018C),
                                                             border: Border.all(
-                                                              color: Color(
+                                                              color: const Color(
                                                                   0x80000000),
                                                             ),
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     0.0, 0.0),
                                                             child: Text(
                                                               '중',
@@ -11122,16 +9735,16 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                           decoration:
                                                               BoxDecoration(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0xFF08018C),
                                                             border: Border.all(
-                                                              color: Color(
+                                                              color: const Color(
                                                                   0x80000000),
                                                             ),
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     0.0, 0.0),
                                                             child: Text(
                                                               '종',
@@ -11167,17 +9780,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                           decoration:
                                                               BoxDecoration(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0xFF08018C),
                                                             border: Border.all(
-                                                              color: Color(
+                                                              color: const Color(
                                                                   0x80000000),
                                                               width: 2.0,
                                                             ),
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     0.0, 0.0),
                                                             child: Text(
                                                               '평균',
@@ -11219,16 +9832,16 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                           decoration:
                                                               BoxDecoration(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x3308018C),
                                                             border: Border.all(
-                                                              color: Color(
+                                                              color: const Color(
                                                                   0x80000000),
                                                             ),
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     0.0, 0.0),
                                                             child: Text(
                                                               '1',
@@ -11249,6 +9862,9 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                             ),
                                                           ),
                                                         ),
+                                                        IndexedText(),
+                                                        IndexedText(),
+                                                        IndexedText(),
                                                         Container(
                                                           width:
                                                               MediaQuery.sizeOf(
@@ -11262,149 +9878,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                           decoration:
                                                               BoxDecoration(
-                                                            color: FlutterFlowTheme
-                                                                    .of(context)
-                                                                .secondaryBackground,
-                                                            border: Border.all(
-                                                              color: Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '초1',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: FlutterFlowTheme
-                                                                    .of(context)
-                                                                .secondaryBackground,
-                                                            border: Border.all(
-                                                              color: Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '중1',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: FlutterFlowTheme
-                                                                    .of(context)
-                                                                .secondaryBackground,
-                                                            border: Border.all(
-                                                              color: Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '종1',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x66B6B6B6),
                                                             border: Border.all(
-                                                              color: Color(
+                                                              color: const Color(
                                                                   0x80000000),
                                                               width: 1.0,
                                                             ),
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     0.0, 0.0),
                                                             child: Text(
                                                               '평균1',
@@ -11444,16 +9928,16 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                           decoration:
                                                               BoxDecoration(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x3308018C),
                                                             border: Border.all(
-                                                              color: Color(
+                                                              color: const Color(
                                                                   0x80000000),
                                                             ),
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     0.0, 0.0),
                                                             child: Text(
                                                               '2',
@@ -11474,6 +9958,9 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                             ),
                                                           ),
                                                         ),
+                                                        IndexedText(),
+                                                        IndexedText(),
+                                                        IndexedText(),
                                                         Container(
                                                           width:
                                                               MediaQuery.sizeOf(
@@ -11487,149 +9974,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                           decoration:
                                                               BoxDecoration(
-                                                            color: FlutterFlowTheme
-                                                                    .of(context)
-                                                                .secondaryBackground,
-                                                            border: Border.all(
-                                                              color: Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '초2',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: FlutterFlowTheme
-                                                                    .of(context)
-                                                                .secondaryBackground,
-                                                            border: Border.all(
-                                                              color: Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '중2',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: FlutterFlowTheme
-                                                                    .of(context)
-                                                                .secondaryBackground,
-                                                            border: Border.all(
-                                                              color: Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '종2',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x66B6B6B6),
                                                             border: Border.all(
-                                                              color: Color(
+                                                              color: const Color(
                                                                   0x80000000),
                                                               width: 1.0,
                                                             ),
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     0.0, 0.0),
                                                             child: Text(
                                                               '평균2',
@@ -11669,16 +10024,16 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                           decoration:
                                                               BoxDecoration(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x3308018C),
                                                             border: Border.all(
-                                                              color: Color(
+                                                              color: const Color(
                                                                   0x80000000),
                                                             ),
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     0.0, 0.0),
                                                             child: Text(
                                                               '3',
@@ -11716,16 +10071,20 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     .of(context)
                                                                 .secondaryBackground,
                                                             border: Border.all(
-                                                              color: Color(
+                                                              color: const Color(
                                                                   0x80000000),
                                                             ),
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     0.0, 0.0),
                                                             child: Text(
-                                                              '초3',
+                                                              getValue(
+                                                                  Constants
+                                                                      .names[3],
+                                                                  "3",
+                                                                  0),
                                                               style: FlutterFlowTheme
                                                                       .of(context)
                                                                   .bodyMedium
@@ -11760,16 +10119,20 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     .of(context)
                                                                 .secondaryBackground,
                                                             border: Border.all(
-                                                              color: Color(
+                                                              color: const Color(
                                                                   0x80000000),
                                                             ),
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     0.0, 0.0),
                                                             child: Text(
-                                                              '중3',
+                                                              getValue(
+                                                                  Constants
+                                                                      .names[3],
+                                                                  "3",
+                                                                  1),
                                                               style: FlutterFlowTheme
                                                                       .of(context)
                                                                   .bodyMedium
@@ -11804,16 +10167,20 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     .of(context)
                                                                 .secondaryBackground,
                                                             border: Border.all(
-                                                              color: Color(
+                                                              color: const Color(
                                                                   0x80000000),
                                                             ),
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     0.0, 0.0),
                                                             child: Text(
-                                                              '종3',
+                                                              getValue(
+                                                                  Constants
+                                                                      .names[3],
+                                                                  "3",
+                                                                  2),
                                                               style: FlutterFlowTheme
                                                                       .of(context)
                                                                   .bodyMedium
@@ -11844,20 +10211,23 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                           decoration:
                                                               BoxDecoration(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x66B6B6B6),
                                                             border: Border.all(
-                                                              color: Color(
+                                                              color: const Color(
                                                                   0x80000000),
                                                               width: 1.0,
                                                             ),
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     0.0, 0.0),
                                                             child: Text(
-                                                              '평균3',
+                                                              getAverage(
+                                                                  Constants
+                                                                      .names[3],
+                                                                  "3"),
                                                               style: FlutterFlowTheme
                                                                       .of(context)
                                                                   .bodyMedium
@@ -11894,16 +10264,16 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                           decoration:
                                                               BoxDecoration(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x3308018C),
                                                             border: Border.all(
-                                                              color: Color(
+                                                              color: const Color(
                                                                   0x80000000),
                                                             ),
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     0.0, 0.0),
                                                             child: Text(
                                                               '4',
@@ -11924,6 +10294,9 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                             ),
                                                           ),
                                                         ),
+                                                        IndexedText(),
+                                                        IndexedText(),
+                                                        IndexedText(),
                                                         Container(
                                                           width:
                                                               MediaQuery.sizeOf(
@@ -11937,149 +10310,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                           decoration:
                                                               BoxDecoration(
-                                                            color: FlutterFlowTheme
-                                                                    .of(context)
-                                                                .secondaryBackground,
-                                                            border: Border.all(
-                                                              color: Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '초4',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: FlutterFlowTheme
-                                                                    .of(context)
-                                                                .secondaryBackground,
-                                                            border: Border.all(
-                                                              color: Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '중4',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: FlutterFlowTheme
-                                                                    .of(context)
-                                                                .secondaryBackground,
-                                                            border: Border.all(
-                                                              color: Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '종4',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x66B6B6B6),
                                                             border: Border.all(
-                                                              color: Color(
+                                                              color: const Color(
                                                                   0x80000000),
                                                               width: 1.0,
                                                             ),
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     0.0, 0.0),
                                                             child: Text(
                                                               '평균4',
@@ -12119,16 +10360,16 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                           decoration:
                                                               BoxDecoration(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x3308018C),
                                                             border: Border.all(
-                                                              color: Color(
+                                                              color: const Color(
                                                                   0x80000000),
                                                             ),
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     0.0, 0.0),
                                                             child: Text(
                                                               '5',
@@ -12149,6 +10390,9 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                             ),
                                                           ),
                                                         ),
+                                                        IndexedText(),
+                                                        IndexedText(),
+                                                        IndexedText(),
                                                         Container(
                                                           width:
                                                               MediaQuery.sizeOf(
@@ -12162,149 +10406,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                           decoration:
                                                               BoxDecoration(
-                                                            color: FlutterFlowTheme
-                                                                    .of(context)
-                                                                .secondaryBackground,
-                                                            border: Border.all(
-                                                              color: Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '초5',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: FlutterFlowTheme
-                                                                    .of(context)
-                                                                .secondaryBackground,
-                                                            border: Border.all(
-                                                              color: Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '중5',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: FlutterFlowTheme
-                                                                    .of(context)
-                                                                .secondaryBackground,
-                                                            border: Border.all(
-                                                              color: Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '종5',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x66B6B6B6),
                                                             border: Border.all(
-                                                              color: Color(
+                                                              color: const Color(
                                                                   0x80000000),
                                                               width: 1.0,
                                                             ),
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     0.0, 0.0),
                                                             child: Text(
                                                               '평균5',
@@ -12344,16 +10456,16 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                           decoration:
                                                               BoxDecoration(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x3308018C),
                                                             border: Border.all(
-                                                              color: Color(
+                                                              color: const Color(
                                                                   0x80000000),
                                                             ),
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     0.0, 0.0),
                                                             child: Text(
                                                               '6',
@@ -12374,6 +10486,9 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                             ),
                                                           ),
                                                         ),
+                                                        IndexedText(),
+                                                        IndexedText(),
+                                                        IndexedText(),
                                                         Container(
                                                           width:
                                                               MediaQuery.sizeOf(
@@ -12387,149 +10502,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                           decoration:
                                                               BoxDecoration(
-                                                            color: FlutterFlowTheme
-                                                                    .of(context)
-                                                                .secondaryBackground,
-                                                            border: Border.all(
-                                                              color: Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '초5',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: FlutterFlowTheme
-                                                                    .of(context)
-                                                                .secondaryBackground,
-                                                            border: Border.all(
-                                                              color: Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '중6',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: FlutterFlowTheme
-                                                                    .of(context)
-                                                                .secondaryBackground,
-                                                            border: Border.all(
-                                                              color: Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '종6',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x66B6B6B6),
                                                             border: Border.all(
-                                                              color: Color(
+                                                              color: const Color(
                                                                   0x80000000),
                                                               width: 1.0,
                                                             ),
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     0.0, 0.0),
                                                             child: Text(
                                                               '평균6',
@@ -12569,16 +10552,16 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.045,
                                                           decoration:
                                                               BoxDecoration(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0xFF08018C),
                                                             border: Border.all(
-                                                              color: Color(
+                                                              color: const Color(
                                                                   0x80000000),
                                                             ),
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     0.0, 0.0),
                                                             child: Text(
                                                               '불량',
@@ -12618,17 +10601,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     .of(context)
                                                                 .secondaryBackground,
                                                             border: Border.all(
-                                                              color: Color(
+                                                              color: const Color(
                                                                   0x80000000),
                                                             ),
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     -1.0, 0.0),
                                                             child: Padding(
                                                               padding:
-                                                                  EdgeInsetsDirectional
+                                                                  const EdgeInsetsDirectional
                                                                       .fromSTEB(
                                                                           8.0,
                                                                           0.0,
@@ -12674,17 +10657,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     .of(context)
                                                                 .secondaryBackground,
                                                             border: Border.all(
-                                                              color: Color(
+                                                              color: const Color(
                                                                   0x80000000),
                                                             ),
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     -1.0, 0.0),
                                                             child: Padding(
                                                               padding:
-                                                                  EdgeInsetsDirectional
+                                                                  const EdgeInsetsDirectional
                                                                       .fromSTEB(
                                                                           8.0,
                                                                           0.0,
@@ -12740,7 +10723,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                           .secondaryBackground,
                                     ),
                                     child: Align(
-                                      alignment: AlignmentDirectional(0.0, 0.0),
+                                      alignment: const AlignmentDirectional(0.0, 0.0),
                                       child: Row(
                                         mainAxisSize: MainAxisSize.max,
                                         mainAxisAlignment:
@@ -12750,7 +10733,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                         children: [
                                           Padding(
                                             padding:
-                                                EdgeInsetsDirectional.fromSTEB(
+                                                const EdgeInsetsDirectional.fromSTEB(
                                                     24.0, 0.0, 0.0, 0.0),
                                             child: Container(
                                               width: MediaQuery.sizeOf(context)
@@ -12762,7 +10745,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                     FlutterFlowTheme.of(context)
                                                         .secondaryBackground,
                                                 border: Border.all(
-                                                  color: Color(0x00FFFFFF),
+                                                  color: const Color(0x00FFFFFF),
                                                 ),
                                               ),
                                               child: Row(
@@ -12770,7 +10753,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                 children: [
                                                   Padding(
                                                     padding:
-                                                        EdgeInsetsDirectional
+                                                        const EdgeInsetsDirectional
                                                             .fromSTEB(4.0, 4.0,
                                                                 4.0, 4.0),
                                                     child: ClipRRect(
@@ -12790,7 +10773,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                   ),
                                                   Padding(
                                                     padding:
-                                                        EdgeInsetsDirectional
+                                                        const EdgeInsetsDirectional
                                                             .fromSTEB(8.0, 0.0,
                                                                 0.0, 0.0),
                                                     child: Text(
@@ -12815,7 +10798,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                           ),
                                           Align(
                                             alignment:
-                                                AlignmentDirectional(0.0, 0.0),
+                                                const AlignmentDirectional(0.0, 0.0),
                                             child: Container(
                                               width: MediaQuery.sizeOf(context)
                                                       .width *
@@ -12832,7 +10815,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                   width: 0.0,
                                                 ),
                                               ),
-                                              alignment: AlignmentDirectional(
+                                              alignment: const AlignmentDirectional(
                                                   0.0, 0.0),
                                               child: Column(
                                                 mainAxisSize: MainAxisSize.max,
@@ -12855,15 +10838,15 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                         decoration:
                                                             BoxDecoration(
                                                           color:
-                                                              Color(0x32B6B6B6),
+                                                              const Color(0x32B6B6B6),
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             '차종(모델)',
@@ -12905,13 +10888,13 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   .of(context)
                                                               .secondaryBackground,
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             'Aurora1',
@@ -12948,15 +10931,15 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                         decoration:
                                                             BoxDecoration(
                                                           color:
-                                                              Color(0x32B6B6B6),
+                                                              const Color(0x32B6B6B6),
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             '공정명',
@@ -12998,13 +10981,13 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   .of(context)
                                                               .secondaryBackground,
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             'Φ4.76 사두',
@@ -13047,15 +11030,15 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                         decoration:
                                                             BoxDecoration(
                                                           color:
-                                                              Color(0x32B6B6B6),
+                                                              const Color(0x32B6B6B6),
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             '품번',
@@ -13095,13 +11078,13 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   .of(context)
                                                               .secondaryBackground,
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             'ALL',
@@ -13138,15 +11121,15 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                         decoration:
                                                             BoxDecoration(
                                                           color:
-                                                              Color(0x32B6B6B6),
+                                                              const Color(0x32B6B6B6),
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             '특별특성',
@@ -13188,13 +11171,13 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   .of(context)
                                                               .secondaryBackground,
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: ClipRRect(
                                                             borderRadius:
@@ -13231,15 +11214,15 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                         decoration:
                                                             BoxDecoration(
                                                           color:
-                                                              Color(0x32B6B6B6),
+                                                              const Color(0x32B6B6B6),
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             '구분',
@@ -13281,13 +11264,13 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   .of(context)
                                                               .secondaryBackground,
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Padding(
                                                           padding:
-                                                              EdgeInsetsDirectional
+                                                              const EdgeInsetsDirectional
                                                                   .fromSTEB(
                                                                       0.0,
                                                                       0.0,
@@ -13303,11 +11286,11 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                             children: [
                                                               Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: EdgeInsetsDirectional
+                                                                  padding: const EdgeInsetsDirectional
                                                                       .fromSTEB(
                                                                           4.0,
                                                                           0.0,
@@ -13322,7 +11305,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                             .height *
                                                                         0.013,
                                                                     decoration:
-                                                                        BoxDecoration(
+                                                                        const BoxDecoration(
                                                                       color: Colors
                                                                           .black,
                                                                     ),
@@ -13348,11 +11331,11 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                               ),
                                                               Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: EdgeInsetsDirectional
+                                                                  padding: const EdgeInsetsDirectional
                                                                       .fromSTEB(
                                                                           12.0,
                                                                           0.0,
@@ -13399,11 +11382,11 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                               ),
                                                               Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: EdgeInsetsDirectional
+                                                                  padding: const EdgeInsetsDirectional
                                                                       .fromSTEB(
                                                                           12.0,
                                                                           0.0,
@@ -13450,11 +11433,11 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                               ),
                                                               Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: EdgeInsetsDirectional
+                                                                  padding: const EdgeInsetsDirectional
                                                                       .fromSTEB(
                                                                           12.0,
                                                                           0.0,
@@ -13517,15 +11500,15 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                         decoration:
                                                             BoxDecoration(
                                                           color:
-                                                              Color(0x32B6B6B6),
+                                                              const Color(0x32B6B6B6),
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             '관리번호',
@@ -13567,13 +11550,13 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   .of(context)
                                                               .secondaryBackground,
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             'MS-014',
@@ -13607,9 +11590,9 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                 ),
                                 Expanded(
                                   child: Align(
-                                    alignment: AlignmentDirectional(0.0, 0.0),
+                                    alignment: const AlignmentDirectional(0.0, 0.0),
                                     child: Padding(
-                                      padding: EdgeInsetsDirectional.fromSTEB(
+                                      padding: const EdgeInsetsDirectional.fromSTEB(
                                           0.0, 12.0, 0.0, 0.0),
                                       child: Row(
                                         mainAxisSize: MainAxisSize.max,
@@ -13628,7 +11611,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                               children: [
                                                 Align(
                                                   alignment:
-                                                      AlignmentDirectional(
+                                                      const AlignmentDirectional(
                                                           0.0, 0.0),
                                                   child: Container(
                                                     width: MediaQuery.sizeOf(
@@ -13649,7 +11632,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                     ),
                                                     child: Padding(
                                                       padding:
-                                                          EdgeInsetsDirectional
+                                                          const EdgeInsetsDirectional
                                                               .fromSTEB(
                                                                   8.0,
                                                                   8.0,
@@ -13671,11 +11654,11 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                 ),
                                                 Align(
                                                   alignment:
-                                                      AlignmentDirectional(
+                                                      const AlignmentDirectional(
                                                           0.0, 0.0),
                                                   child: Padding(
                                                     padding:
-                                                        EdgeInsetsDirectional
+                                                        const EdgeInsetsDirectional
                                                             .fromSTEB(0.0, 8.0,
                                                                 0.0, 0.0),
                                                     child: Container(
@@ -13693,12 +11676,12 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                             .secondaryBackground,
                                                         border: Border.all(
                                                           color:
-                                                              Color(0xFA000000),
+                                                              const Color(0xFA000000),
                                                           width: 1.0,
                                                         ),
                                                       ),
                                                       alignment:
-                                                          AlignmentDirectional(
+                                                          const AlignmentDirectional(
                                                               0.0, 0.0),
                                                       child: ClipRRect(
                                                         borderRadius:
@@ -13724,11 +11707,11 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                 ),
                                                 Align(
                                                   alignment:
-                                                      AlignmentDirectional(
+                                                      const AlignmentDirectional(
                                                           0.0, 1.0),
                                                   child: Padding(
                                                     padding:
-                                                        EdgeInsetsDirectional
+                                                        const EdgeInsetsDirectional
                                                             .fromSTEB(0.0, 8.0,
                                                                 0.0, 0.0),
                                                     child: Container(
@@ -13750,7 +11733,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                       ),
                                                       child: Padding(
                                                         padding:
-                                                            EdgeInsetsDirectional
+                                                            const EdgeInsetsDirectional
                                                                 .fromSTEB(
                                                                     4.0,
                                                                     0.0,
@@ -13791,7 +11774,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                               children: [
                                                 Align(
                                                   alignment:
-                                                      AlignmentDirectional(
+                                                      const AlignmentDirectional(
                                                           0.0, 0.0),
                                                   child: Row(
                                                     mainAxisSize:
@@ -13802,7 +11785,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                     children: [
                                                       Padding(
                                                         padding:
-                                                            EdgeInsetsDirectional
+                                                            const EdgeInsetsDirectional
                                                                 .fromSTEB(
                                                                     0.0,
                                                                     0.0,
@@ -13820,13 +11803,13 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                           onTap: () async {
                                                             FFAppState()
                                                                     .CurrentDate =
-                                                                functions.updateDate(
+                                                                FFAppState().updateDate(
                                                                     FFAppState()
                                                                         .CurrentDate,
                                                                     -1)!;
                                                             safeSetState(() {});
                                                           },
-                                                          child: FaIcon(
+                                                          child: const FaIcon(
                                                             FontAwesomeIcons
                                                                 .caretLeft,
                                                             color: Color(
@@ -13837,11 +11820,11 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                       ),
                                                       Align(
                                                         alignment:
-                                                            AlignmentDirectional(
+                                                            const AlignmentDirectional(
                                                                 0.0, 0.0),
                                                         child: Padding(
                                                           padding:
-                                                              EdgeInsetsDirectional
+                                                              const EdgeInsetsDirectional
                                                                   .fromSTEB(
                                                                       0.0,
                                                                       0.0,
@@ -13870,7 +11853,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                       ),
                                                       Align(
                                                         alignment:
-                                                            AlignmentDirectional(
+                                                            const AlignmentDirectional(
                                                                 0.0, 0.0),
                                                         child: Text(
                                                           FFAppState()
@@ -13894,7 +11877,129 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                       ),
                                                       Padding(
                                                         padding:
-                                                            EdgeInsetsDirectional
+                                                            const EdgeInsetsDirectional
+                                                                .fromSTEB(
+                                                                    16.0,
+                                                                    0.0,
+                                                                    0.0,
+                                                                    0.0),
+                                                        child: InkWell(
+                                                          splashColor: Colors
+                                                              .transparent,
+                                                          focusColor: Colors
+                                                              .transparent,
+                                                          hoverColor: Colors
+                                                              .transparent,
+                                                          highlightColor: Colors
+                                                              .transparent,
+                                                          onTap: () async {
+                                                            final _datePicked1Date =
+                                                                await showDatePicker(
+                                                              context: context,
+                                                              initialDate:
+                                                                  DateTime.parse(
+                                                                      FFAppState()
+                                                                          .CurrentDate),
+                                                              firstDate:
+                                                                  DateTime(
+                                                                      1900),
+                                                              lastDate:
+                                                                  getCurrentTimestamp,
+                                                              builder: (context,
+                                                                  child) {
+                                                                return wrapInMaterialDatePickerTheme(
+                                                                  context,
+                                                                  child!,
+                                                                  headerBackgroundColor:
+                                                                      const Color(
+                                                                          0xFF08018C),
+                                                                  headerForegroundColor:
+                                                                      FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .info,
+                                                                  headerTextStyle: FlutterFlowTheme.of(
+                                                                          context)
+                                                                      .headlineLarge
+                                                                      .override(
+                                                                        fontFamily:
+                                                                            'Inter Tight',
+                                                                        fontSize:
+                                                                            32.0,
+                                                                        letterSpacing:
+                                                                            0.0,
+                                                                        fontWeight:
+                                                                            FontWeight.w600,
+                                                                      ),
+                                                                  pickerBackgroundColor:
+                                                                      FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .secondaryBackground,
+                                                                  pickerForegroundColor:
+                                                                      FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .primaryText,
+                                                                  selectedDateTimeBackgroundColor:
+                                                                      const Color(
+                                                                          0xFF08018C),
+                                                                  selectedDateTimeForegroundColor:
+                                                                      FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .info,
+                                                                  actionButtonForegroundColor:
+                                                                      FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .primaryText,
+                                                                  iconSize:
+                                                                      25.0,
+                                                                );
+                                                              },
+                                                            );
+
+                                                            if (_datePicked1Date !=
+                                                                null) {
+                                                              safeSetState(() {
+                                                                if (_datePicked1Date
+                                                                        .month <
+                                                                    10) {
+                                                                  if (_datePicked1Date
+                                                                          .day <
+                                                                      10) {
+                                                                    FFAppState()
+                                                                            .CurrentDate =
+                                                                        "${_datePicked1Date.year}-0${_datePicked1Date.month}-0${_datePicked1Date.day}";
+                                                                  } else {
+                                                                    FFAppState()
+                                                                            .CurrentDate =
+                                                                        "${_datePicked1Date.year}-0${_datePicked1Date.month}-${_datePicked1Date.day}";
+                                                                  }
+                                                                } else {
+                                                                  if (_datePicked1Date
+                                                                          .day <
+                                                                      10) {
+                                                                    FFAppState()
+                                                                            .CurrentDate =
+                                                                        "${_datePicked1Date.year}-${_datePicked1Date.month}-0${_datePicked1Date.day}";
+                                                                  } else {
+                                                                    FFAppState()
+                                                                            .CurrentDate =
+                                                                        "${_datePicked1Date.year}-${_datePicked1Date.month}-${_datePicked1Date.day}";
+                                                                  }
+                                                                }
+                                                              });
+                                                            }
+                                                          },
+                                                          child: const Icon(
+                                                            Icons
+                                                                .calendar_month,
+                                                            color: Color(
+                                                                0xFF08018C),
+                                                            size: 40.0,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      Padding(
+                                                        padding:
+                                                            const EdgeInsetsDirectional
                                                                 .fromSTEB(
                                                                     16.0,
                                                                     0.0,
@@ -13912,13 +12017,13 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                           onTap: () async {
                                                             FFAppState()
                                                                     .CurrentDate =
-                                                                functions.updateDate(
+                                                                FFAppState().updateDate(
                                                                     FFAppState()
                                                                         .CurrentDate,
                                                                     1)!;
                                                             safeSetState(() {});
                                                           },
-                                                          child: FaIcon(
+                                                          child: const FaIcon(
                                                             FontAwesomeIcons
                                                                 .caretRight,
                                                             color: Color(
@@ -13927,7 +12032,8 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                           ),
                                                         ),
                                                       ),
-                                                    ],
+                                                    ].addToStart(
+                                                        const SizedBox(width: 40.0)),
                                                   ),
                                                 ),
                                                 Container(
@@ -13962,15 +12068,15 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                         decoration:
                                                             BoxDecoration(
                                                           color:
-                                                              Color(0xFF08018C),
+                                                              const Color(0xFF08018C),
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             '품번',
@@ -14010,13 +12116,13 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   .of(context)
                                                               .secondaryBackground,
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             '-',
@@ -14041,7 +12147,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                   ),
                                                 ),
                                                 Padding(
-                                                  padding: EdgeInsetsDirectional
+                                                  padding: const EdgeInsetsDirectional
                                                       .fromSTEB(
                                                           0.0, 4.0, 0.0, 4.0),
                                                   child: Container(
@@ -14063,7 +12169,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                     ),
                                                     child: Padding(
                                                       padding:
-                                                          EdgeInsetsDirectional
+                                                          const EdgeInsetsDirectional
                                                               .fromSTEB(
                                                                   8.0,
                                                                   8.0,
@@ -14073,18 +12179,32 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                         borderRadius:
                                                             BorderRadius
                                                                 .circular(8.0),
-                                                        child: Image.network(
-                                                          'https://picsum.photos/seed/510/60',
-                                                          width: 200.0,
-                                                          height: 200.0,
-                                                          fit: BoxFit.cover,
-                                                        ),
+                                                        child: receivedImages[_model
+                                                                    .tabBarCurrentIndex] !=
+                                                                null
+                                                            ? Image.memory(
+                                                                receivedImages[
+                                                                    _model
+                                                                        .tabBarCurrentIndex]!,
+                                                                height: 300,
+                                                                width: double
+                                                                    .infinity,
+                                                                fit: BoxFit
+                                                                    .fitHeight,
+                                                              )
+                                                            : Image.network(
+                                                                'https://picsum.photos/seed/510/60',
+                                                                width: 200.0,
+                                                                height: 200.0,
+                                                                fit: BoxFit
+                                                                    .cover,
+                                                              ),
                                                       ),
                                                     ),
                                                   ),
                                                 ),
                                                 Padding(
-                                                  padding: EdgeInsetsDirectional
+                                                  padding: const EdgeInsetsDirectional
                                                       .fromSTEB(
                                                           4.0, 4.0, 4.0, 4.0),
                                                   child: Container(
@@ -14126,17 +12246,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0xFF08018C),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -14172,17 +12292,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0xFF08018C),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -14218,17 +12338,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0xFF08018C),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -14264,17 +12384,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0xFF08018C),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -14310,18 +12430,18 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0xFF08018C),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                   width: 1.0,
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -14363,17 +12483,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0x3308018C),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -14394,6 +12514,9 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                 ),
                                                               ),
                                                             ),
+                                                            IndexedText(),
+                                                            IndexedText(),
+                                                            IndexedText(),
                                                             Container(
                                                               width: MediaQuery
                                                                           .sizeOf(
@@ -14407,153 +12530,18 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '초1',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '중1',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '종1',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0x32B6B6B6),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                   width: 1.0,
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -14593,17 +12581,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0x3308018C),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -14642,17 +12630,21 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     .secondaryBackground,
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
-                                                                  '초2',
+                                                                  getValue(
+                                                                      Constants
+                                                                          .names[4],
+                                                                      "2",
+                                                                      0),
                                                                   style: FlutterFlowTheme.of(
                                                                           context)
                                                                       .bodyMedium
@@ -14687,17 +12679,21 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     .secondaryBackground,
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
-                                                                  '중2',
+                                                                  getValue(
+                                                                      Constants
+                                                                          .names[4],
+                                                                      "2",
+                                                                      1),
                                                                   style: FlutterFlowTheme.of(
                                                                           context)
                                                                       .bodyMedium
@@ -14732,17 +12728,21 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     .secondaryBackground,
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
-                                                                  '종2',
+                                                                  getValue(
+                                                                      Constants
+                                                                          .names[4],
+                                                                      "2",
+                                                                      2),
                                                                   style: FlutterFlowTheme.of(
                                                                           context)
                                                                       .bodyMedium
@@ -14772,22 +12772,25 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0x32B6B6B6),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                   width: 1.0,
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
-                                                                  '평균2',
+                                                                  getAverage(
+                                                                      Constants
+                                                                          .names[4],
+                                                                      "2"),
                                                                   style: FlutterFlowTheme.of(
                                                                           context)
                                                                       .bodyMedium
@@ -14823,17 +12826,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0x3308018C),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -14872,17 +12875,21 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     .secondaryBackground,
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
-                                                                  '초3',
+                                                                  getValue(
+                                                                      Constants
+                                                                          .names[4],
+                                                                      "3",
+                                                                      0),
                                                                   style: FlutterFlowTheme.of(
                                                                           context)
                                                                       .bodyMedium
@@ -14917,17 +12924,21 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     .secondaryBackground,
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
-                                                                  '중3',
+                                                                  getValue(
+                                                                      Constants
+                                                                          .names[4],
+                                                                      "3",
+                                                                      1),
                                                                   style: FlutterFlowTheme.of(
                                                                           context)
                                                                       .bodyMedium
@@ -14962,17 +12973,21 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     .secondaryBackground,
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
-                                                                  '종3',
+                                                                  getValue(
+                                                                      Constants
+                                                                          .names[4],
+                                                                      "3",
+                                                                      2),
                                                                   style: FlutterFlowTheme.of(
                                                                           context)
                                                                       .bodyMedium
@@ -15002,22 +13017,25 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0x32B6B6B6),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                   width: 1.0,
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
-                                                                  '평균3',
+                                                                  getAverage(
+                                                                      Constants
+                                                                          .names[4],
+                                                                      "3"),
                                                                   style: FlutterFlowTheme.of(
                                                                           context)
                                                                       .bodyMedium
@@ -15053,17 +13071,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0x3308018C),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -15102,17 +13120,21 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     .secondaryBackground,
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
-                                                                  '초4',
+                                                                  getValue(
+                                                                      Constants
+                                                                          .names[4],
+                                                                      "4",
+                                                                      0),
                                                                   style: FlutterFlowTheme.of(
                                                                           context)
                                                                       .bodyMedium
@@ -15147,17 +13169,21 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     .secondaryBackground,
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
-                                                                  '중4',
+                                                                  getValue(
+                                                                      Constants
+                                                                          .names[4],
+                                                                      "4",
+                                                                      1),
                                                                   style: FlutterFlowTheme.of(
                                                                           context)
                                                                       .bodyMedium
@@ -15192,17 +13218,21 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     .secondaryBackground,
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
-                                                                  '종4',
+                                                                  getValue(
+                                                                      Constants
+                                                                          .names[4],
+                                                                      "4",
+                                                                      2),
                                                                   style: FlutterFlowTheme.of(
                                                                           context)
                                                                       .bodyMedium
@@ -15232,22 +13262,25 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0x32B6B6B6),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                   width: 1.0,
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
-                                                                  '평균4',
+                                                                  getAverage(
+                                                                      Constants
+                                                                          .names[4],
+                                                                      "4"),
                                                                   style: FlutterFlowTheme.of(
                                                                           context)
                                                                       .bodyMedium
@@ -15283,17 +13316,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0x3308018C),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -15314,6 +13347,9 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                 ),
                                                               ),
                                                             ),
+                                                            IndexedText(),
+                                                            IndexedText(),
+                                                            IndexedText(),
                                                             Container(
                                                               width: MediaQuery
                                                                           .sizeOf(
@@ -15327,153 +13363,18 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '초5',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '중5',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '종5',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0x32B6B6B6),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                   width: 1.0,
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -15513,17 +13414,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0x3308018C),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -15544,6 +13445,9 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                 ),
                                                               ),
                                                             ),
+                                                            IndexedText(),
+                                                            IndexedText(),
+                                                            IndexedText(),
                                                             Container(
                                                               width: MediaQuery
                                                                           .sizeOf(
@@ -15557,153 +13461,18 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '초6',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '중6',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '종6',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0x32B6B6B6),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                   width: 1.0,
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -15743,17 +13512,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0x3308018C),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -15774,6 +13543,9 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                 ),
                                                               ),
                                                             ),
+                                                            IndexedText(),
+                                                            IndexedText(),
+                                                            IndexedText(),
                                                             Container(
                                                               width: MediaQuery
                                                                           .sizeOf(
@@ -15787,153 +13559,18 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '초7',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '중7',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '종7',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0x32B6B6B6),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                   width: 1.0,
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -15973,17 +13610,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0x3308018C),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -16004,6 +13641,9 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                 ),
                                                               ),
                                                             ),
+                                                            IndexedText(),
+                                                            IndexedText(),
+                                                            IndexedText(),
                                                             Container(
                                                               width: MediaQuery
                                                                           .sizeOf(
@@ -16017,153 +13657,18 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '초8',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '중8',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '종8',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0x32B6B6B6),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                   width: 1.0,
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -16216,7 +13721,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                           .secondaryBackground,
                                     ),
                                     child: Align(
-                                      alignment: AlignmentDirectional(0.0, 0.0),
+                                      alignment: const AlignmentDirectional(0.0, 0.0),
                                       child: Row(
                                         mainAxisSize: MainAxisSize.max,
                                         mainAxisAlignment:
@@ -16226,7 +13731,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                         children: [
                                           Padding(
                                             padding:
-                                                EdgeInsetsDirectional.fromSTEB(
+                                                const EdgeInsetsDirectional.fromSTEB(
                                                     24.0, 0.0, 0.0, 0.0),
                                             child: Container(
                                               width: MediaQuery.sizeOf(context)
@@ -16238,7 +13743,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                     FlutterFlowTheme.of(context)
                                                         .secondaryBackground,
                                                 border: Border.all(
-                                                  color: Color(0x00FFFFFF),
+                                                  color: const Color(0x00FFFFFF),
                                                 ),
                                               ),
                                               child: Row(
@@ -16246,7 +13751,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                 children: [
                                                   Padding(
                                                     padding:
-                                                        EdgeInsetsDirectional
+                                                        const EdgeInsetsDirectional
                                                             .fromSTEB(4.0, 4.0,
                                                                 4.0, 4.0),
                                                     child: ClipRRect(
@@ -16266,7 +13771,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                   ),
                                                   Padding(
                                                     padding:
-                                                        EdgeInsetsDirectional
+                                                        const EdgeInsetsDirectional
                                                             .fromSTEB(8.0, 0.0,
                                                                 0.0, 0.0),
                                                     child: Text(
@@ -16291,7 +13796,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                           ),
                                           Align(
                                             alignment:
-                                                AlignmentDirectional(0.0, 0.0),
+                                                const AlignmentDirectional(0.0, 0.0),
                                             child: Container(
                                               width: MediaQuery.sizeOf(context)
                                                       .width *
@@ -16308,7 +13813,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                   width: 0.0,
                                                 ),
                                               ),
-                                              alignment: AlignmentDirectional(
+                                              alignment: const AlignmentDirectional(
                                                   0.0, 0.0),
                                               child: Column(
                                                 mainAxisSize: MainAxisSize.max,
@@ -16331,15 +13836,15 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                         decoration:
                                                             BoxDecoration(
                                                           color:
-                                                              Color(0x32B6B6B6),
+                                                              const Color(0x32B6B6B6),
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             '차종(모델)',
@@ -16381,13 +13886,13 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   .of(context)
                                                               .secondaryBackground,
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             'Aurora1',
@@ -16424,15 +13929,15 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                         decoration:
                                                             BoxDecoration(
                                                           color:
-                                                              Color(0x32B6B6B6),
+                                                              const Color(0x32B6B6B6),
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             '공정명',
@@ -16474,13 +13979,13 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   .of(context)
                                                               .secondaryBackground,
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             'Φ4.76 나팔',
@@ -16523,15 +14028,15 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                         decoration:
                                                             BoxDecoration(
                                                           color:
-                                                              Color(0x32B6B6B6),
+                                                              const Color(0x32B6B6B6),
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             '품번',
@@ -16571,13 +14076,13 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   .of(context)
                                                               .secondaryBackground,
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             'ALL',
@@ -16614,15 +14119,15 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                         decoration:
                                                             BoxDecoration(
                                                           color:
-                                                              Color(0x32B6B6B6),
+                                                              const Color(0x32B6B6B6),
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             '특별특성',
@@ -16664,13 +14169,13 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   .of(context)
                                                               .secondaryBackground,
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: ClipRRect(
                                                             borderRadius:
@@ -16707,15 +14212,15 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                         decoration:
                                                             BoxDecoration(
                                                           color:
-                                                              Color(0x32B6B6B6),
+                                                              const Color(0x32B6B6B6),
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             '구분',
@@ -16757,13 +14262,13 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   .of(context)
                                                               .secondaryBackground,
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Padding(
                                                           padding:
-                                                              EdgeInsetsDirectional
+                                                              const EdgeInsetsDirectional
                                                                   .fromSTEB(
                                                                       0.0,
                                                                       0.0,
@@ -16779,11 +14284,11 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                             children: [
                                                               Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: EdgeInsetsDirectional
+                                                                  padding: const EdgeInsetsDirectional
                                                                       .fromSTEB(
                                                                           4.0,
                                                                           0.0,
@@ -16798,7 +14303,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                             .height *
                                                                         0.013,
                                                                     decoration:
-                                                                        BoxDecoration(
+                                                                        const BoxDecoration(
                                                                       color: Colors
                                                                           .black,
                                                                     ),
@@ -16824,11 +14329,11 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                               ),
                                                               Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: EdgeInsetsDirectional
+                                                                  padding: const EdgeInsetsDirectional
                                                                       .fromSTEB(
                                                                           12.0,
                                                                           0.0,
@@ -16875,11 +14380,11 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                               ),
                                                               Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: EdgeInsetsDirectional
+                                                                  padding: const EdgeInsetsDirectional
                                                                       .fromSTEB(
                                                                           12.0,
                                                                           0.0,
@@ -16926,11 +14431,11 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                               ),
                                                               Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: EdgeInsetsDirectional
+                                                                  padding: const EdgeInsetsDirectional
                                                                       .fromSTEB(
                                                                           12.0,
                                                                           0.0,
@@ -16993,15 +14498,15 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                         decoration:
                                                             BoxDecoration(
                                                           color:
-                                                              Color(0x32B6B6B6),
+                                                              const Color(0x32B6B6B6),
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             '관리번호',
@@ -17043,13 +14548,13 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   .of(context)
                                                               .secondaryBackground,
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             'MS-015',
@@ -17083,9 +14588,9 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                 ),
                                 Expanded(
                                   child: Align(
-                                    alignment: AlignmentDirectional(0.0, 0.0),
+                                    alignment: const AlignmentDirectional(0.0, 0.0),
                                     child: Padding(
-                                      padding: EdgeInsetsDirectional.fromSTEB(
+                                      padding: const EdgeInsetsDirectional.fromSTEB(
                                           0.0, 12.0, 0.0, 0.0),
                                       child: Row(
                                         mainAxisSize: MainAxisSize.max,
@@ -17104,7 +14609,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                               children: [
                                                 Align(
                                                   alignment:
-                                                      AlignmentDirectional(
+                                                      const AlignmentDirectional(
                                                           0.0, 0.0),
                                                   child: Container(
                                                     width: MediaQuery.sizeOf(
@@ -17125,7 +14630,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                     ),
                                                     child: Padding(
                                                       padding:
-                                                          EdgeInsetsDirectional
+                                                          const EdgeInsetsDirectional
                                                               .fromSTEB(
                                                                   8.0,
                                                                   8.0,
@@ -17147,11 +14652,11 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                 ),
                                                 Align(
                                                   alignment:
-                                                      AlignmentDirectional(
+                                                      const AlignmentDirectional(
                                                           0.0, 0.0),
                                                   child: Padding(
                                                     padding:
-                                                        EdgeInsetsDirectional
+                                                        const EdgeInsetsDirectional
                                                             .fromSTEB(0.0, 8.0,
                                                                 0.0, 0.0),
                                                     child: Container(
@@ -17172,7 +14677,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                         ),
                                                       ),
                                                       alignment:
-                                                          AlignmentDirectional(
+                                                          const AlignmentDirectional(
                                                               0.0, 0.0),
                                                       child: ClipRRect(
                                                         borderRadius:
@@ -17198,11 +14703,11 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                 ),
                                                 Align(
                                                   alignment:
-                                                      AlignmentDirectional(
+                                                      const AlignmentDirectional(
                                                           0.0, 1.0),
                                                   child: Padding(
                                                     padding:
-                                                        EdgeInsetsDirectional
+                                                        const EdgeInsetsDirectional
                                                             .fromSTEB(0.0, 8.0,
                                                                 0.0, 0.0),
                                                     child: Container(
@@ -17224,7 +14729,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                       ),
                                                       child: Padding(
                                                         padding:
-                                                            EdgeInsetsDirectional
+                                                            const EdgeInsetsDirectional
                                                                 .fromSTEB(
                                                                     4.0,
                                                                     0.0,
@@ -17265,7 +14770,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                               children: [
                                                 Align(
                                                   alignment:
-                                                      AlignmentDirectional(
+                                                      const AlignmentDirectional(
                                                           0.0, 0.0),
                                                   child: Row(
                                                     mainAxisSize:
@@ -17276,7 +14781,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                     children: [
                                                       Padding(
                                                         padding:
-                                                            EdgeInsetsDirectional
+                                                            const EdgeInsetsDirectional
                                                                 .fromSTEB(
                                                                     0.0,
                                                                     0.0,
@@ -17294,13 +14799,13 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                           onTap: () async {
                                                             FFAppState()
                                                                     .CurrentDate =
-                                                                functions.updateDate(
+                                                                FFAppState().updateDate(
                                                                     FFAppState()
                                                                         .CurrentDate,
                                                                     -1)!;
                                                             safeSetState(() {});
                                                           },
-                                                          child: FaIcon(
+                                                          child: const FaIcon(
                                                             FontAwesomeIcons
                                                                 .caretLeft,
                                                             color: Color(
@@ -17311,11 +14816,11 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                       ),
                                                       Align(
                                                         alignment:
-                                                            AlignmentDirectional(
+                                                            const AlignmentDirectional(
                                                                 0.0, 0.0),
                                                         child: Padding(
                                                           padding:
-                                                              EdgeInsetsDirectional
+                                                              const EdgeInsetsDirectional
                                                                   .fromSTEB(
                                                                       0.0,
                                                                       0.0,
@@ -17344,7 +14849,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                       ),
                                                       Align(
                                                         alignment:
-                                                            AlignmentDirectional(
+                                                            const AlignmentDirectional(
                                                                 0.0, 0.0),
                                                         child: Text(
                                                           FFAppState()
@@ -17368,7 +14873,129 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                       ),
                                                       Padding(
                                                         padding:
-                                                            EdgeInsetsDirectional
+                                                            const EdgeInsetsDirectional
+                                                                .fromSTEB(
+                                                                    16.0,
+                                                                    0.0,
+                                                                    0.0,
+                                                                    0.0),
+                                                        child: InkWell(
+                                                          splashColor: Colors
+                                                              .transparent,
+                                                          focusColor: Colors
+                                                              .transparent,
+                                                          hoverColor: Colors
+                                                              .transparent,
+                                                          highlightColor: Colors
+                                                              .transparent,
+                                                          onTap: () async {
+                                                            final _datePicked1Date =
+                                                                await showDatePicker(
+                                                              context: context,
+                                                              initialDate:
+                                                                  DateTime.parse(
+                                                                      FFAppState()
+                                                                          .CurrentDate),
+                                                              firstDate:
+                                                                  DateTime(
+                                                                      1900),
+                                                              lastDate:
+                                                                  getCurrentTimestamp,
+                                                              builder: (context,
+                                                                  child) {
+                                                                return wrapInMaterialDatePickerTheme(
+                                                                  context,
+                                                                  child!,
+                                                                  headerBackgroundColor:
+                                                                      const Color(
+                                                                          0xFF08018C),
+                                                                  headerForegroundColor:
+                                                                      FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .info,
+                                                                  headerTextStyle: FlutterFlowTheme.of(
+                                                                          context)
+                                                                      .headlineLarge
+                                                                      .override(
+                                                                        fontFamily:
+                                                                            'Inter Tight',
+                                                                        fontSize:
+                                                                            32.0,
+                                                                        letterSpacing:
+                                                                            0.0,
+                                                                        fontWeight:
+                                                                            FontWeight.w600,
+                                                                      ),
+                                                                  pickerBackgroundColor:
+                                                                      FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .secondaryBackground,
+                                                                  pickerForegroundColor:
+                                                                      FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .primaryText,
+                                                                  selectedDateTimeBackgroundColor:
+                                                                      const Color(
+                                                                          0xFF08018C),
+                                                                  selectedDateTimeForegroundColor:
+                                                                      FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .info,
+                                                                  actionButtonForegroundColor:
+                                                                      FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .primaryText,
+                                                                  iconSize:
+                                                                      25.0,
+                                                                );
+                                                              },
+                                                            );
+
+                                                            if (_datePicked1Date !=
+                                                                null) {
+                                                              safeSetState(() {
+                                                                if (_datePicked1Date
+                                                                        .month <
+                                                                    10) {
+                                                                  if (_datePicked1Date
+                                                                          .day <
+                                                                      10) {
+                                                                    FFAppState()
+                                                                            .CurrentDate =
+                                                                        "${_datePicked1Date.year}-0${_datePicked1Date.month}-0${_datePicked1Date.day}";
+                                                                  } else {
+                                                                    FFAppState()
+                                                                            .CurrentDate =
+                                                                        "${_datePicked1Date.year}-0${_datePicked1Date.month}-${_datePicked1Date.day}";
+                                                                  }
+                                                                } else {
+                                                                  if (_datePicked1Date
+                                                                          .day <
+                                                                      10) {
+                                                                    FFAppState()
+                                                                            .CurrentDate =
+                                                                        "${_datePicked1Date.year}-${_datePicked1Date.month}-0${_datePicked1Date.day}";
+                                                                  } else {
+                                                                    FFAppState()
+                                                                            .CurrentDate =
+                                                                        "${_datePicked1Date.year}-${_datePicked1Date.month}-${_datePicked1Date.day}";
+                                                                  }
+                                                                }
+                                                              });
+                                                            }
+                                                          },
+                                                          child: const Icon(
+                                                            Icons
+                                                                .calendar_month,
+                                                            color: Color(
+                                                                0xFF08018C),
+                                                            size: 40.0,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      Padding(
+                                                        padding:
+                                                            const EdgeInsetsDirectional
                                                                 .fromSTEB(
                                                                     16.0,
                                                                     0.0,
@@ -17386,13 +15013,13 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                           onTap: () async {
                                                             FFAppState()
                                                                     .CurrentDate =
-                                                                functions.updateDate(
+                                                                FFAppState().updateDate(
                                                                     FFAppState()
                                                                         .CurrentDate,
                                                                     1)!;
                                                             safeSetState(() {});
                                                           },
-                                                          child: FaIcon(
+                                                          child: const FaIcon(
                                                             FontAwesomeIcons
                                                                 .caretRight,
                                                             color: Color(
@@ -17401,7 +15028,8 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                           ),
                                                         ),
                                                       ),
-                                                    ],
+                                                    ].addToStart(
+                                                        const SizedBox(width: 40.0)),
                                                   ),
                                                 ),
                                                 Container(
@@ -17436,15 +15064,15 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                         decoration:
                                                             BoxDecoration(
                                                           color:
-                                                              Color(0xFF08018C),
+                                                              const Color(0xFF08018C),
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             '품번',
@@ -17484,13 +15112,13 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   .of(context)
                                                               .secondaryBackground,
                                                           border: Border.all(
-                                                            color: Color(
+                                                            color: const Color(
                                                                 0x80000000),
                                                           ),
                                                         ),
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
                                                             '-',
@@ -17515,7 +15143,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                   ),
                                                 ),
                                                 Padding(
-                                                  padding: EdgeInsetsDirectional
+                                                  padding: const EdgeInsetsDirectional
                                                       .fromSTEB(
                                                           0.0, 4.0, 0.0, 4.0),
                                                   child: Container(
@@ -17537,7 +15165,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                     ),
                                                     child: Padding(
                                                       padding:
-                                                          EdgeInsetsDirectional
+                                                          const EdgeInsetsDirectional
                                                               .fromSTEB(
                                                                   8.0,
                                                                   8.0,
@@ -17547,18 +15175,32 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                         borderRadius:
                                                             BorderRadius
                                                                 .circular(8.0),
-                                                        child: Image.network(
-                                                          'https://picsum.photos/seed/510/60',
-                                                          width: 200.0,
-                                                          height: 200.0,
-                                                          fit: BoxFit.cover,
-                                                        ),
+                                                        child: receivedImages[_model
+                                                                    .tabBarCurrentIndex] !=
+                                                                null
+                                                            ? Image.memory(
+                                                                receivedImages[
+                                                                    _model
+                                                                        .tabBarCurrentIndex]!,
+                                                                height: 300,
+                                                                width: double
+                                                                    .infinity,
+                                                                fit: BoxFit
+                                                                    .fitHeight,
+                                                              )
+                                                            : Image.network(
+                                                                'https://picsum.photos/seed/510/60',
+                                                                width: 200.0,
+                                                                height: 200.0,
+                                                                fit: BoxFit
+                                                                    .cover,
+                                                              ),
                                                       ),
                                                     ),
                                                   ),
                                                 ),
                                                 Padding(
-                                                  padding: EdgeInsetsDirectional
+                                                  padding: const EdgeInsetsDirectional
                                                       .fromSTEB(
                                                           4.0, 4.0, 4.0, 4.0),
                                                   child: Container(
@@ -17600,17 +15242,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0xFF08018C),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -17646,17 +15288,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0xFF08018C),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -17692,17 +15334,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0xFF08018C),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -17738,17 +15380,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0xFF08018C),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -17784,18 +15426,18 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0xFF08018C),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                   width: 1.0,
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -17837,17 +15479,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0x3308018C),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -17868,6 +15510,9 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                 ),
                                                               ),
                                                             ),
+                                                            IndexedText(),
+                                                            IndexedText(),
+                                                            IndexedText(),
                                                             Container(
                                                               width: MediaQuery
                                                                           .sizeOf(
@@ -17881,153 +15526,18 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '초1',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '중1',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '종1',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0x32B6B6B6),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                   width: 1.0,
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -18067,17 +15577,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0x3308018C),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -18116,17 +15626,21 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     .secondaryBackground,
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
-                                                                  '초2',
+                                                                  getValue(
+                                                                      Constants
+                                                                          .names[5],
+                                                                      "2",
+                                                                      0),
                                                                   style: FlutterFlowTheme.of(
                                                                           context)
                                                                       .bodyMedium
@@ -18161,17 +15675,21 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     .secondaryBackground,
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
-                                                                  '중2',
+                                                                  getValue(
+                                                                      Constants
+                                                                          .names[5],
+                                                                      "2",
+                                                                      1),
                                                                   style: FlutterFlowTheme.of(
                                                                           context)
                                                                       .bodyMedium
@@ -18206,17 +15724,21 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     .secondaryBackground,
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
-                                                                  '종2',
+                                                                  getValue(
+                                                                      Constants
+                                                                          .names[5],
+                                                                      "2",
+                                                                      2),
                                                                   style: FlutterFlowTheme.of(
                                                                           context)
                                                                       .bodyMedium
@@ -18246,22 +15768,25 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0x32B6B6B6),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                   width: 1.0,
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
-                                                                  '평균2',
+                                                                  getAverage(
+                                                                      Constants
+                                                                          .names[5],
+                                                                      "2"),
                                                                   style: FlutterFlowTheme.of(
                                                                           context)
                                                                       .bodyMedium
@@ -18297,17 +15822,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0x3308018C),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -18346,17 +15871,21 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     .secondaryBackground,
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
-                                                                  '초3',
+                                                                  getValue(
+                                                                      Constants
+                                                                          .names[5],
+                                                                      "3",
+                                                                      0),
                                                                   style: FlutterFlowTheme.of(
                                                                           context)
                                                                       .bodyMedium
@@ -18391,17 +15920,21 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     .secondaryBackground,
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
-                                                                  '중3',
+                                                                  getValue(
+                                                                      Constants
+                                                                          .names[5],
+                                                                      "3",
+                                                                      1),
                                                                   style: FlutterFlowTheme.of(
                                                                           context)
                                                                       .bodyMedium
@@ -18436,17 +15969,21 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     .secondaryBackground,
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
-                                                                  '종3',
+                                                                  getValue(
+                                                                      Constants
+                                                                          .names[5],
+                                                                      "3",
+                                                                      2),
                                                                   style: FlutterFlowTheme.of(
                                                                           context)
                                                                       .bodyMedium
@@ -18476,22 +16013,25 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0x32B6B6B6),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                   width: 1.0,
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
-                                                                  '평균3',
+                                                                  getAverage(
+                                                                      Constants
+                                                                          .names[5],
+                                                                      "3"),
                                                                   style: FlutterFlowTheme.of(
                                                                           context)
                                                                       .bodyMedium
@@ -18527,17 +16067,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0x3308018C),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -18558,6 +16098,9 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                 ),
                                                               ),
                                                             ),
+                                                            IndexedText(),
+                                                            IndexedText(),
+                                                            IndexedText(),
                                                             Container(
                                                               width: MediaQuery
                                                                           .sizeOf(
@@ -18571,153 +16114,18 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '초4',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '중4',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '종4',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0x32B6B6B6),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                   width: 1.0,
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -18757,17 +16165,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0x3308018C),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -18806,17 +16214,21 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     .secondaryBackground,
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
-                                                                  '초5',
+                                                                  getValue(
+                                                                      Constants
+                                                                          .names[5],
+                                                                      "5",
+                                                                      0),
                                                                   style: FlutterFlowTheme.of(
                                                                           context)
                                                                       .bodyMedium
@@ -18851,17 +16263,21 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     .secondaryBackground,
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
-                                                                  '중5',
+                                                                  getValue(
+                                                                      Constants
+                                                                          .names[5],
+                                                                      "5",
+                                                                      1),
                                                                   style: FlutterFlowTheme.of(
                                                                           context)
                                                                       .bodyMedium
@@ -18896,17 +16312,21 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     .secondaryBackground,
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
-                                                                  '종5',
+                                                                  getValue(
+                                                                      Constants
+                                                                          .names[5],
+                                                                      "5",
+                                                                      1),
                                                                   style: FlutterFlowTheme.of(
                                                                           context)
                                                                       .bodyMedium
@@ -18936,22 +16356,25 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0x32B6B6B6),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                   width: 1.0,
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
-                                                                  '평균5',
+                                                                  getAverage(
+                                                                      Constants
+                                                                          .names[5],
+                                                                      "5"),
                                                                   style: FlutterFlowTheme.of(
                                                                           context)
                                                                       .bodyMedium
@@ -18987,17 +16410,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0x3308018C),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -19018,6 +16441,9 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                 ),
                                                               ),
                                                             ),
+                                                            IndexedText(),
+                                                            IndexedText(),
+                                                            IndexedText(),
                                                             Container(
                                                               width: MediaQuery
                                                                           .sizeOf(
@@ -19031,153 +16457,18 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '초6',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '중6',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '종6',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0x32B6B6B6),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                   width: 1.0,
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -19217,17 +16508,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0x3308018C),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -19248,6 +16539,9 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                 ),
                                                               ),
                                                             ),
+                                                            IndexedText(),
+                                                            IndexedText(),
+                                                            IndexedText(),
                                                             Container(
                                                               width: MediaQuery
                                                                           .sizeOf(
@@ -19261,153 +16555,18 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '초7',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '중7',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '종7',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0x32B6B6B6),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                   width: 1.0,
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -19447,17 +16606,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0x3308018C),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -19478,6 +16637,9 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                 ),
                                                               ),
                                                             ),
+                                                            IndexedText(),
+                                                            IndexedText(),
+                                                            IndexedText(),
                                                             Container(
                                                               width: MediaQuery
                                                                           .sizeOf(
@@ -19491,153 +16653,18 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '초8',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '중8',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '종8',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0x32B6B6B6),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                   width: 1.0,
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -19677,17 +16704,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0x3308018C),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -19708,6 +16735,9 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                 ),
                                                               ),
                                                             ),
+                                                            IndexedText(),
+                                                            IndexedText(),
+                                                            IndexedText(),
                                                             Container(
                                                               width: MediaQuery
                                                                           .sizeOf(
@@ -19721,153 +16751,18 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                   0.04,
                                                               decoration:
                                                                   BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '초9',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '중9',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '종9',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: Color(
+                                                                color: const Color(
                                                                     0x32B6B6B6),
                                                                 border:
                                                                     Border.all(
-                                                                  color: Color(
+                                                                  color: const Color(
                                                                       0x80000000),
                                                                   width: 1.0,
                                                                 ),
                                                               ),
                                                               child: Align(
                                                                 alignment:
-                                                                    AlignmentDirectional(
+                                                                    const AlignmentDirectional(
                                                                         0.0,
                                                                         0.0),
                                                                 child: Text(
@@ -19908,7 +16803,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                         ),
                       ),
                       Align(
-                        alignment: Alignment(0.0, 0),
+                        alignment: const Alignment(0.0, 0),
                         child: FlutterFlowButtonTabBar(
                           useToggleButtonStyle: true,
                           labelStyle:
@@ -19925,7 +16820,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                           labelColor: FlutterFlowTheme.of(context).primaryText,
                           unselectedLabelColor:
                               FlutterFlowTheme.of(context).secondaryText,
-                          backgroundColor: Color(0xFFB2B2B2),
+                          backgroundColor: const Color(0xFFB2B2B2),
                           unselectedBackgroundColor:
                               FlutterFlowTheme.of(context).alternate,
                           unselectedBorderColor:
@@ -19933,25 +16828,25 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                           borderWidth: 2.0,
                           borderRadius: 8.0,
                           elevation: 0.0,
-                          buttonMargin: EdgeInsetsDirectional.fromSTEB(
+                          buttonMargin: const EdgeInsetsDirectional.fromSTEB(
                               8.0, 0.0, 8.0, 0.0),
                           tabs: [
-                            Tab(
+                            const Tab(
                               text: 'MS-010',
                             ),
-                            Tab(
+                            const Tab(
                               text: 'MS-011',
                             ),
-                            Tab(
+                            const Tab(
                               text: 'MS-012',
                             ),
-                            Tab(
+                            const Tab(
                               text: 'MS-013',
                             ),
-                            Tab(
+                            const Tab(
                               text: 'MS-014',
                             ),
-                            Tab(
+                            const Tab(
                               text: 'MS-015',
                             ),
                           ],

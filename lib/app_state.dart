@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'data/nobel_data.dart';
 import 'flutter_flow/flutter_flow_util.dart';
 import 'package:intl/intl.dart';
+
 
 class FFAppState extends ChangeNotifier {
   static FFAppState _instance = FFAppState._internal();
@@ -23,13 +25,19 @@ class FFAppState extends ChangeNotifier {
     notifyListeners();
   }
 
+
+
   String _CurrentDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
   String get CurrentDate => _CurrentDate;
+  
   set CurrentDate(String value) {
     _CurrentDate = value;
   }
 
-    
+  Measurements? writeValue(var jsonData){
+    return null;
+  }
+
   String? updateDate(
     String? currentDate,
     int? daysToAdd,
@@ -38,12 +46,18 @@ class FFAppState extends ChangeNotifier {
     if (currentDate == null || daysToAdd == null) {
       return null; // 둘 중 하나라도 null이면 null 반환
     }
-  
+
     // currentDate를 DateTime으로 변환
     final parsedDate = DateTime.parse(currentDate);
 
     // 날짜 계산
     final updatedDate = parsedDate.add(Duration(days: daysToAdd));
+
+    // 현재 날짜와 비교
+    final today = DateTime.now();
+    if (updatedDate.isAfter(today)) {
+      return _CurrentDate; // updatedDate가 현재 날짜를 넘어가면 null 반환
+    }
 
     // yyyy-MM-dd 형식으로 반환
     return "${updatedDate.year}-${updatedDate.month.toString().padLeft(2, '0')}-${updatedDate.day.toString().padLeft(2, '0')}";

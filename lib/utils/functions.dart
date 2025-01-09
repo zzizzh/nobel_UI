@@ -144,7 +144,7 @@ dynamic toJsonFromStartDateToWeek(String startDate){
 
   List dateList = [];
   String? date;
-  while(dateList.length < 7){
+  while(dateList.length < 6){
     date = findNextDate(startDate);
 
     if (date!=null){
