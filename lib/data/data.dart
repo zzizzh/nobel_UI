@@ -2,6 +2,7 @@
 // ignore_for_file: slash_for_doc_comments
 
 import 'dart:convert';
+import 'dart:io';
 
 import '../utils/app_logger.dart';
 import '../utils/const.dart';
@@ -14,17 +15,17 @@ class Data{
    * auther :     John
    * date :       2024-12-27
    */
-  static Map data = Map.from(Constants.JSON_DATA_MAP);
-  static List<String> dateList = [];
+  static dynamic data = Map.from(Constants.JSON_DATA_MAP);
+  static List dateList = [];
 
   static var logger = AppLogger.instance; // 로그 출력용
 
   late String date;                              // 검사 일자
   late String name;                              // 소재 이름(ex: MS-015)
-  late List<double> referenceValues;                      // 측정 기준값
+  late List<double> referenceValues;             // 측정 기준값
   late List<double> errors;                      // 오차
   List<double> manageErrors = [];                // 관리 오차
-  late List<String> checkList;                      // 검사 항목 번호
+  late List<String> checkList;                   // 검사 항목 번호
   bool isComplete = false;
 
   // 사용 미정 데이터
@@ -56,7 +57,7 @@ class Data{
    * auther :     John
    * date :       2024-12-27
    */
-  Data(var jsonData){
+  Data.fromServer(var jsonData){
     List params = Constants.getDataParams(jsonData['name']);
 
     checkList = params[2];
@@ -70,7 +71,7 @@ class Data{
           manageErrors = params[4];
       } 
       
-      List<double> values = jsonData['values'];
+      List values = jsonData['values'];
       date = jsonData['date'];
 
       writeValue(values);
@@ -82,6 +83,33 @@ class Data{
     }
   }
 
+  Data(this.date, this.name, this.measurements){
+    List params = Constants.getDataParams(name);
+
+    checkList = params[2];
+    referenceValues = params[1];
+    errors = params[3];
+    
+    if (name == 'MS-014' || name == 'MS-015'){
+        manageErrors = params[4];
+    }
+    data[name]![date] = this; 
+    
+  }
+
+  factory Data.fromJson(Map<String, dynamic> json) {
+    
+    return Data(json['date'], json['name'], json['measurements']);
+  }
+
+  Map<String, dynamic> toJson(){
+    return {
+      'date' : date,
+      'name' : name,
+      'measurements' : measurements
+    };
+  }
+
 
   /**
    * 모든 측정값 데이터
@@ -90,7 +118,7 @@ class Data{
    * auther :     John
    * date :       2024-12-26
    */
-  Map<String, List<double>> measurements = {}; 
+  dynamic measurements = {}; 
 
 
   /**
@@ -191,12 +219,16 @@ class Data{
    * date :       2024-12-26
    */
   double averageByCheckNum(String checkNum){
+    
     double result = 0;
     List valueList = measurements[checkNum]!;
     for (double value in valueList){
       result += value;
     }
-    return result/valueList.length;
+
+    result =  result/valueList.length;
+
+    return ((result * 10000).roundToDouble()) / 10000;
   }
 
 
@@ -217,61 +249,15 @@ class Data{
   }
 
 
-  /**
-   * !!class method!!
-   * 기존 데이터에 중, 종 측정값을 저장하기 위해 
-   * 소재 데이터 클래스 인스턴스를 가져오기
-   * param 1 :    var json 파이썬 서버로부터 받은 json 데이터
-   * return :     Data 해당 클래스 인스턴스
-   * auther :     John
-   * date :       2024-12-26
-   */
-  static Data? getDataForWriteValue(var jsonData){
-    String date = jsonData['date'];
-    String name = jsonData['name'];
-    
-    if (hasDateInData(date)){
-      if (hasDataByDateAndName(date, name)){
-        return data[date]![name];
-      }
-      logger.e('해당 날짜에 {$name} 데이터가 존재하지 않습니다.');
-    }
-    logger.e('해당 날짜의 데이터가 존재하지 않습니다.');
-    return null;
-  }
 
-
-  /**
-   * !!class method!!
-   * name품명의 특정 날짜 데이터가 있는지 확인
-   * param 1 :    string 날짜 (ex "2024-12-26")
-   * return :     true(해당 날짜에 데이터 존재)
-   *              false(데이터 없음) 
-   * auther :     John
-   * date :       2024-12-27
-   */
-  static bool hasDateInData(String date){
-    for (String name in data.keys){
-      if (data[name].containsKey(date)){
-        return true;
+  // TODO 
+  String getValue(String checkNum, int index){
+    if (measurements.containsKey(checkNum)){
+      if(measurements[checkNum]!.length > index){
+        return measurements[checkNum]![index].toString();
       }
     }
-    return false;
-  }
-
-
-  /**
-   * !!class method!!
-   * 기존 데이터의 특정 날짜에 특정 소재 데이터가 있는지 확인
-   * param 1 :    string 날짜 (ex "2024-12-26")
-   * param 2 :    string 소재 이름 (ex "MS-010")
-   * return :     true(해당 데이터 존재)
-   *              false(데이터 없음) 
-   * auther :     John
-   * date :       2024-12-26
-   */
-  static bool hasDataByDateAndName(String date, String name){
-    return data[date]!.containsKey(name);
+    return '';
   }
 
 
@@ -316,6 +302,14 @@ class Data{
   }
 
 
+  //TODO
+  bool writeValueByKeyboard(String checkNum, int index){
+
+    
+
+    return false;
+  }
+
   /**
    * 자주검사 체크시트 엑셀 파일에 값을 입력하기 위해
    * 특정 품목의 자주검사 일일 검사 데이터를 Json 형식의 데이터로 변환
@@ -323,7 +317,7 @@ class Data{
    * auther :     John
    * date :       2024-12-27
    */
-  dynamic toJson(){
+  dynamic toJsonForExcel(){
 
     Map jsonDataMap = {
       'error_num' : getErrorCount(),
@@ -338,68 +332,4 @@ class Data{
 
     return jsonDataMap;
   }
-
-
-  /**
-   * !! static method !!
-   * 자주검사 체크시트 엑셀 파일에 값을 입력하기 위해
-   * 특정 품목의 자주검사 1주일 검사 데이터를 Json 형식의 데이터로 변환
-   * param 1 :    String 시작 날짜(보통 월요일이지만 공휴일일 경우도 있기 때문)
-   * return :     json (시작 날짜부터 처음 나오는 토요일 까지의 데이터)
-   *              false (실패 시)
-   * auther :     John
-   * date :       2024-12-27
-   */
-  static dynamic toJsonFromStartDateToSaturday(String startDateString){
-    DateTime startDate = DateTime.parse(startDateString);
-    DateTime firstSaturday = findNextSaturday(startDate);
-    
-    Map jsonDataMap = Map.from(Constants.JSON_DATA_MAP);
-    bool isExist = false;
-
-    for (String name in data.keys){
-      for (int day=startDate.day; day<=firstSaturday.day; day++){
-        String date = "${startDate.year}-${startDate.month}-${day}";
-        
-        if (data[name]!.containsKey(date)){
-          var jsonData = data[name]![date]!.toJson();
-            
-          jsonDataMap[name][date] = jsonData;
-          isExist = true;
-        }
-      }
-    }
-    
-    if (!isExist){
-      return false;
-    }
-
-    logger.i(jsonDataMap);
-
-    return json.encode(jsonDataMap);
-  }
-  
-
-  /**
-   * !! static method !!
-   * 특정 날짜에서부터 처음 나오는 토요일 찾기
-   * param 1 :    String 시작 날짜
-   * return :     Datetime 시작 날짜부터 처음 나오는 토요일
-   * auther :     John
-   * date :       2024-12-27
-   */
-  static DateTime findNextSaturday(DateTime date) {
-  // 현재 날짜의 요일
-    int weekday = date.weekday; // 1: 월요일, 7: 일요일
-
-    // 요일 차이 계산 (토요일은 6)
-    int daysToAdd = (6 - weekday) % 7; // 남은 요일 수 계산
-    if (daysToAdd == 0) {
-      daysToAdd = 7; // 이미 토요일이면 다음 주 토요일
-    }
-
-    // 첫 번째 토요일
-    return date.add(Duration(days: daysToAdd));
-  }
-
 }
