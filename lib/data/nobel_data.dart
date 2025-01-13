@@ -4,10 +4,12 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:test_novel_i_r_i_s3/utils/functions.dart';
+
 import '../utils/app_logger.dart';
 import '../utils/const.dart';
 
-class Data{
+class Measurements{
 
   /**
    * 전체 데이터
@@ -37,7 +39,7 @@ class Data{
   /**
    * 처음 소재에 대한 측정값을 파이썬 서버에서 받으면
    * 소재 클래스가 생성되고 전체 데이터 셋의 날짜에 
-   * 소재 이름에 저장된다. Map<이름, Map<날짜, Data>>
+   * 소재 이름에 저장된다. Map<이름, Map<날짜, Measurements>>
    * 
    * ex) 
    * {
@@ -57,7 +59,7 @@ class Data{
    * auther :     John
    * date :       2024-12-27
    */
-  Data.fromServer(var jsonData){
+  Measurements.fromServer(var jsonData){
     List params = Constants.getDataParams(jsonData['name']);
 
     checkList = params[2];
@@ -83,7 +85,7 @@ class Data{
     }
   }
 
-  Data(this.date, this.name, this.measurements){
+  Measurements(this.date, this.name, this.measurements){
     List params = Constants.getDataParams(name);
 
     checkList = params[2];
@@ -97,17 +99,27 @@ class Data{
     
   }
 
-  factory Data.fromJson(Map<String, dynamic> json) {
+  factory Measurements.fromJson(Map<String, dynamic> json) {
     
-    return Data(json['date'], json['name'], json['measurements']);
+    return Measurements(json['date'], json['name'], json['measurements']);
   }
 
   Map<String, dynamic> toJson(){
-    return {
+    Map<String, dynamic> mapData = {
       'date' : date,
       'name' : name,
-      'measurements' : measurements
+      'measurements' : jsonDecode(jsonEncode(measurements)),
+      'error count' : getErrorCount()
     };
+    List<double> averageValues = averageAllValues();
+
+    int averageIndex = 0;
+
+    for (String checkNum in measurements.keys){
+      mapData['measurements'][checkNum].add(averageValues[averageIndex]);
+    }
+
+    return mapData;
   }
 
 
@@ -322,7 +334,7 @@ class Data{
 
     Map jsonDataMap = {
       'error_num' : getErrorCount(),
-      'values' : measurements,
+      'values' : Map.from(measurements),
       'error_data' : getErrorData(),
     };
 
@@ -332,5 +344,11 @@ class Data{
     }
 
     return jsonDataMap;
+  }
+
+  dynamic toJsonForSendToServer(){
+    Map jsonDataMap = {
+
+    };
   }
 }

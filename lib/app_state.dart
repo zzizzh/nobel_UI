@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'data/nobel_data.dart';
@@ -27,6 +29,7 @@ class FFAppState extends ChangeNotifier {
 
 
 
+  Socket? socket;
   String _CurrentDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
   String get CurrentDate => _CurrentDate;
   

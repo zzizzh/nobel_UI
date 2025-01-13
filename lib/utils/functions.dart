@@ -6,8 +6,11 @@ import 'package:test_novel_i_r_i_s3/app_state.dart';
 import 'package:test_novel_i_r_i_s3/utils/app_logger.dart';
 import 'package:test_novel_i_r_i_s3/utils/const.dart';
 import 'dart:collection';
-import '../data/data.dart';
+import '../data/nobel_data.dart';
+import 'dart:io';
+import 'package:excel/excel.dart';
 
+import '../flutter_flow/flutter_flow_util.dart';
 
 /// UI 평균값 칸에 값을 표시
 /// param 1 :    소재 이름
@@ -18,8 +21,8 @@ import '../data/data.dart';
 /// date :       2024-01-06
 String getValue(String name, String checkNum, int index){
   String currentDate = FFAppState().CurrentDate;
-  if (Data.data[name]!.containsKey(currentDate)){
-    return Data.data[name]![currentDate]!.getValue(checkNum, index);
+  if (Measurements.data[name]!.containsKey(currentDate)){
+    return Measurements.data[name]![currentDate]!.getValue(checkNum, index);
   }
   return '';
 }
@@ -32,8 +35,8 @@ String getValue(String name, String checkNum, int index){
 /// date :       2024-01-06
 String getAverage(String name, String checkNum){
   String currentDate = FFAppState().CurrentDate;
-  if (Data.data[name]!.containsKey(currentDate)){
-    return Data.data[name]![currentDate]!.averageByCheckNum(checkNum).toString();
+  if (Measurements.data[name]!.containsKey(currentDate)){
+    return Measurements.data[name]![currentDate]!.averageByCheckNum(checkNum).toString();
   }
   return '';
 }
@@ -42,11 +45,11 @@ String getAverage(String name, String checkNum){
 /// 기존 데이터에 중, 종 측정값을 저장하기 위해 
 /// 소재 데이터 클래스 인스턴스를 가져오기
 /// param 1 :    var json 파이썬 서버로부터 받은 json 데이터
-/// return :     Data 해당 클래스 인스턴스
+/// return :     Measurements 해당 클래스 인스턴스
 /// auther :     John
 /// date :       2024-12-26
-Data? getDataForWriteValue(var jsonData){
-  Map data = Data.data;
+Measurements? getDataForWriteValue(var jsonData){
+  Map data = Measurements.data;
   Logger logger = AppLogger.instance;
 
   String date = jsonData['date'];
@@ -72,7 +75,7 @@ Data? getDataForWriteValue(var jsonData){
 /// auther :     John
 /// date :       2024-12-26
 bool hasDataByDateAndName(String date, String name){
-  Map data = Data.data;
+  Map data = Measurements.data;
   return data[date]!.containsKey(name);
 }
 
@@ -84,7 +87,7 @@ bool hasDataByDateAndName(String date, String name){
 /// auther :     John
 /// date :       2024-12-27
 bool hasDateInData(String date){
-  Map data = Data.data;
+  Map data = Measurements.data;
   for (String name in data.keys){
     if (data[name]!.containsKey(date)){
       return true;
@@ -105,7 +108,7 @@ dynamic toJsonFromStartDateToSaturday(String startDateString){
   DateTime startDate = DateTime.parse(startDateString);
   DateTime firstSaturday = findNextSaturday(startDate);
   Logger logger = AppLogger.instance;
-  Map data = Data.data;
+  Map data = Measurements.data;
   
   Map jsonDataMap = Map.from(Constants.JSON_DATA_MAP);
   bool isExist = false;
@@ -140,7 +143,7 @@ dynamic toJsonFromStartDateToSaturday(String startDateString){
 /// date :       2024-01-09
 dynamic toJsonFromStartDateToWeek(String startDate){
 
-  Map data = Data.data;
+  Map data = Measurements.data;
 
   List dateList = [];
   String? date;
@@ -149,13 +152,32 @@ dynamic toJsonFromStartDateToWeek(String startDate){
 
     if (date!=null){
       dateList.add(date);
+
+      if (date == startDate){
+        // 1. 입력된 날짜 문자열을 DateTime으로 변환
+        DateTime dateTime = DateFormat('yyyy-MM-dd').parse(date);
+
+        // 2. 다음 날짜 계산
+        DateTime nextDate = dateTime.add(Duration(days: 1));
+
+        date = DateFormat('yyyy-MM-dd').format(nextDate);
+      }
+      
+      startDate = date;
     }
     else{
       break;
     }
   }
   
-  Map jsonMap = json.decode(json.encode(Constants.JSON_DATA_MAP));
+  Map jsonMap =   {
+    "MS-010": <String, dynamic>{},
+    "MS-011": <String, dynamic>{},
+    "MS-012": <String, dynamic>{},
+    "MS-013": <String, dynamic>{},
+    "MS-014": <String, dynamic>{},
+    "MS-015": <String, dynamic>{}
+  };
 
   for(String name in Constants.names){
     for(String date in dateList){
@@ -188,7 +210,7 @@ DateTime findNextSaturday(DateTime date) {
 
 
 String? findNextDate(String targetDate) {
-  List sortedDates = Data.dateList;
+  List sortedDates = Measurements.dateList;
 
   // 정렬된 리스트가 입력되었다고 가정
   if (sortedDates.isEmpty) return null;
@@ -221,4 +243,123 @@ int lowerBound(List<DateTime> list, DateTime value) {
     }
   }
   return low;
+}
+
+Future<void> saveExcelFile({
+  required Map mapData, // 입력할 값
+}) async {
+  
+  String filePath = Constants.excelPath;
+  String firstDate = '';
+
+  try {
+    // 1. 기존 Excel 파일을 읽기
+    var file = File(filePath);
+    if (!await file.exists()) {
+      throw Exception("파일이 존재하지 않습니다: $filePath");
+    }
+
+    var bytes = file.readAsBytesSync();
+    var excel = Excel.decodeBytes(bytes);
+    int dateIndex = 0;
+    int dataIndex = 0;
+    int row; // 숫자
+    int col; // 영어
+    Measurements data;
+
+    for (String name in mapData.keys){
+      var sheet = excel[Constants.sheetNames[name]];
+
+      for (String date in mapData[name].keys){
+        if (firstDate == ''){
+          firstDate = date;
+        }
+
+        if (mapData[name].containsKey(date)){
+          data = mapData[name][date];
+        }
+        else{
+          continue;
+        }
+        
+        var dateCellCoordinates = _parseCellPosition(Constants.cellIndex['date']![dateIndex]);
+
+        if (dateCellCoordinates == null) {
+          throw Exception("잘못된 셀 위치 형식입니다: $dateCellCoordinates");
+        }  
+        row = dateCellCoordinates[0];
+        col = dateCellCoordinates[1];
+
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row)).value = date;
+
+        for (String checkNum in data.checkList){
+          for (int i = 0; i< data.measurements[checkNum].length; i++){
+            
+            var valueCellCoordinates = _parseCellPosition(Constants.cellIndex['values']![dateIndex]);
+
+            if (valueCellCoordinates == null) {
+              throw Exception("잘못된 셀 위치 형식입니다: $valueCellCoordinates");
+            }
+
+            if (dateIndex > 2){
+              row = valueCellCoordinates[0] + Constants.getDataParams(name)[5] as int;
+            }
+            else{
+              row = valueCellCoordinates[0];
+            }
+
+
+            if (i == data.measurements[checkNum].length - 1){
+              col = valueCellCoordinates[1] + 2 * 3;
+            }
+            else{
+              col = valueCellCoordinates[1] + 2 * dataIndex++;
+            }
+
+            sheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row)).value = data.measurements[checkNum][i];
+            String newFilePath = 'C:\\UND\\$firstDate$dataIndex';
+            var newFile = File(newFilePath)
+              ..createSync(recursive: true)
+              ..writeAsBytesSync(excel.encode()!);
+
+            print("파일이 성공적으로 저장되었습니다: $firstDate");
+          }
+          dataIndex = 0;
+        }
+        dateIndex++;
+      }
+      dateIndex = 0;
+    }
+    
+    // 4. 새 파일로 저장
+    String newFilePath = 'C:\\UND\\$firstDate$dataIndex';
+    var newFile = File(newFilePath)
+      ..createSync(recursive: true)
+      ..writeAsBytesSync(excel.encode()!);
+
+    print("파일이 성공적으로 저장되었습니다: $firstDate");
+  } catch (e) {
+    print("오류 발생: $e");
+  }
+}
+
+List<int>? _parseCellPosition(String cellPosition) {
+  final regex = RegExp(r'^([A-Z]+)([0-9]+)$');
+  final match = regex.firstMatch(cellPosition);
+  if (match == null) return null;
+
+  String columnPart = match.group(1)!;
+  String rowPart = match.group(2)!;
+
+  int row = int.parse(rowPart) - 1; // 0-based index로 변환
+  int col = 0;
+
+  // 열(Column) 계산
+  for (int i = 0; i < columnPart.length; i++) {
+    col *= 26; // 자리수 반영
+    col += columnPart.codeUnitAt(i) - 'A'.codeUnitAt(0) + 1;
+  }
+  col -= 1; // 0-based index로 변환
+
+  return [row, col];
 }

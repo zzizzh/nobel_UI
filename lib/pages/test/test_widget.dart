@@ -72,8 +72,11 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
   }
 
   void startSocket() async {
+    
     try {
       final socket = await Socket.connect('127.0.0.1', 12345);
+      FFAppState().socket = socket;
+
       print('Connected to server');
 
       // 데이터 버퍼 생성
@@ -106,6 +109,11 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
 
           String date = receivedMap["date"];
           String name = receivedMap["name"];
+
+          if (!Constants.names.contains(name)){
+            return;
+          }
+
           if (!Measurements.dateList.contains(date)) {
             Measurements.dateList.add(date);
             Measurements.dateList.sort((a, b) {
@@ -126,7 +134,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
 
           Map dateListMap = {"dateList": Measurements.dateList};
 
-          saveJsonToFile(Constants.dataPath, json.encode(dateListMap));
+          saveNestedMapToFile(Measurements.data);
           saveJsonToFile(Constants.dateListPath, json.encode(dateListMap));
 
           // UI 업데이트
@@ -1210,7 +1218,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                   width:
                                                       MediaQuery.sizeOf(context)
                                                               .width *
-                                                          0.36,
+                                                          0.362,
                                                   height:
                                                       MediaQuery.sizeOf(context)
                                                               .height *
@@ -1648,6 +1656,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                 ),
                                               ),
                                             ),
+                                            //-----표1번시작------------------------------------------------------------------
                                             Row(
                                               mainAxisSize: MainAxisSize.max,
                                               mainAxisAlignment:
@@ -2803,6 +2812,8 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                 ),
                               ],
                             ),
+                            //-----표1번끝------------------------------------------------------------------
+
                             Column(
                               mainAxisSize: MainAxisSize.max,
                               children: [
@@ -3792,7 +3803,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                   width:
                                                       MediaQuery.sizeOf(context)
                                                               .width *
-                                                          0.36,
+                                                          0.362,
                                                   height:
                                                       MediaQuery.sizeOf(context)
                                                               .height *
@@ -4230,6 +4241,8 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                 ),
                                               ),
                                             ),
+
+                                            //-----표2번시작------------------------------------------------------------------
                                             Row(
                                               mainAxisSize: MainAxisSize.max,
                                               mainAxisAlignment:
@@ -5412,6 +5425,9 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                 ),
                               ],
                             ),
+                            //-----표2번끝------------------------------------------------------------------
+
+
                             Column(
                               mainAxisSize: MainAxisSize.max,
                               children: [
@@ -6401,7 +6417,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                   width:
                                                       MediaQuery.sizeOf(context)
                                                               .width *
-                                                          0.36,
+                                                          0.362,
                                                   height:
                                                       MediaQuery.sizeOf(context)
                                                               .height *
@@ -6839,1290 +6855,1303 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                 ),
                                               ),
                                             ),
-                                            Padding(
-                                              padding: const EdgeInsetsDirectional
-                                                  .fromSTEB(2.0, 2.0, 2.0, 2.0),
-                                              child: Container(
-                                                width:
-                                                    MediaQuery.sizeOf(context)
-                                                            .width *
-                                                        0.332,
-                                                height:
-                                                    MediaQuery.sizeOf(context)
-                                                            .height *
-                                                        0.329,
-                                                decoration: BoxDecoration(
-                                                  color: FlutterFlowTheme.of(
-                                                          context)
-                                                      .secondaryBackground,
-                                                  border: Border.all(
-                                                    color: Colors.white,
-                                                    width: 0.0,
+
+                                            //-----표3번시작------------------------------------------------------------------
+                                            Row(
+                                              mainAxisSize: MainAxisSize.max,
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.end,
+                                              children: [    
+                                                Padding(
+                                                  padding: const EdgeInsetsDirectional
+                                                      .fromSTEB(2.0, 2.0, 2.0, 2.0),
+                                                  child: Container(
+                                                    width:
+                                                        MediaQuery.sizeOf(context)
+                                                                .width *
+                                                            0.332,
+                                                    height:
+                                                        MediaQuery.sizeOf(context)
+                                                                .height *
+                                                            0.329,
+                                                    decoration: BoxDecoration(
+                                                      color: FlutterFlowTheme.of(
+                                                              context)
+                                                          .secondaryBackground,
+                                                      border: Border.all(
+                                                        color: Colors.white,
+                                                        width: 0.0,
+                                                      ),
+                                                    ),
+                                                    child: Column(
+                                                      mainAxisSize:
+                                                          MainAxisSize.max,
+                                                      children: [
+                                                        Row(
+                                                          mainAxisSize:
+                                                              MainAxisSize.max,
+                                                          children: [
+                                                            Container(
+                                                              width:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .width *
+                                                                      0.05,
+                                                              height:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .height *
+                                                                      0.04,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: const Color(
+                                                                    0xFF08018C),
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                      0x80000000),
+                                                                ),
+                                                              ),
+                                                              child: Align(
+                                                                alignment:
+                                                                    const AlignmentDirectional(
+                                                                        0.0, 0.0),
+                                                                child: Text(
+                                                                  'NO.',
+                                                                  style: FlutterFlowTheme
+                                                                          .of(context)
+                                                                      .bodyMedium
+                                                                      .override(
+                                                                        fontFamily:
+                                                                            'Inter',
+                                                                        color: Colors
+                                                                            .white,
+                                                                        fontSize:
+                                                                            25.0,
+                                                                        letterSpacing:
+                                                                            0.0,
+                                                                        fontWeight:
+                                                                            FontWeight
+                                                                                .w600,
+                                                                      ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                            Container(
+                                                              width:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .width *
+                                                                      0.07,
+                                                              height:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .height *
+                                                                      0.04,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: const Color(
+                                                                    0xFF08018C),
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                      0x80000000),
+                                                                ),
+                                                              ),
+                                                              child: Align(
+                                                                alignment:
+                                                                    const AlignmentDirectional(
+                                                                        0.0, 0.0),
+                                                                child: Text(
+                                                                  '초',
+                                                                  style: FlutterFlowTheme
+                                                                          .of(context)
+                                                                      .bodyMedium
+                                                                      .override(
+                                                                        fontFamily:
+                                                                            'Inter',
+                                                                        color: Colors
+                                                                            .white,
+                                                                        fontSize:
+                                                                            25.0,
+                                                                        letterSpacing:
+                                                                            0.0,
+                                                                        fontWeight:
+                                                                            FontWeight
+                                                                                .w600,
+                                                                      ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                            Container(
+                                                              width:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .width *
+                                                                      0.07,
+                                                              height:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .height *
+                                                                      0.04,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: const Color(
+                                                                    0xFF08018C),
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                      0x80000000),
+                                                                ),
+                                                              ),
+                                                              child: Align(
+                                                                alignment:
+                                                                    const AlignmentDirectional(
+                                                                        0.0, 0.0),
+                                                                child: Text(
+                                                                  '중',
+                                                                  style: FlutterFlowTheme
+                                                                          .of(context)
+                                                                      .bodyMedium
+                                                                      .override(
+                                                                        fontFamily:
+                                                                            'Inter',
+                                                                        color: Colors
+                                                                            .white,
+                                                                        fontSize:
+                                                                            25.0,
+                                                                        letterSpacing:
+                                                                            0.0,
+                                                                        fontWeight:
+                                                                            FontWeight
+                                                                                .w600,
+                                                                      ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                            Container(
+                                                              width:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .width *
+                                                                      0.07,
+                                                              height:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .height *
+                                                                      0.04,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: const Color(
+                                                                    0xFF08018C),
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                      0x80000000),
+                                                                ),
+                                                              ),
+                                                              child: Align(
+                                                                alignment:
+                                                                    const AlignmentDirectional(
+                                                                        0.0, 0.0),
+                                                                child: Text(
+                                                                  '종',
+                                                                  style: FlutterFlowTheme
+                                                                          .of(context)
+                                                                      .bodyMedium
+                                                                      .override(
+                                                                        fontFamily:
+                                                                            'Inter',
+                                                                        color: Colors
+                                                                            .white,
+                                                                        fontSize:
+                                                                            25.0,
+                                                                        letterSpacing:
+                                                                            0.0,
+                                                                        fontWeight:
+                                                                            FontWeight
+                                                                                .w600,
+                                                                      ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                            Container(
+                                                              width:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .width *
+                                                                      0.07,
+                                                              height:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .height *
+                                                                      0.04,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: const Color(
+                                                                    0xFF08018C),
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                      0x80000000),
+                                                                  width: 2.0,
+                                                                ),
+                                                              ),
+                                                              child: Align(
+                                                                alignment:
+                                                                    const AlignmentDirectional(
+                                                                        0.0, 0.0),
+                                                                child: Text(
+                                                                  '평균',
+                                                                  style: FlutterFlowTheme
+                                                                          .of(context)
+                                                                      .bodyMedium
+                                                                      .override(
+                                                                        fontFamily:
+                                                                            'Inter',
+                                                                        color: Colors
+                                                                            .white,
+                                                                        fontSize:
+                                                                            25.0,
+                                                                        letterSpacing:
+                                                                            0.0,
+                                                                        fontWeight:
+                                                                            FontWeight
+                                                                                .w600,
+                                                                      ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                        Row(
+                                                          mainAxisSize:
+                                                              MainAxisSize.max,
+                                                          children: [
+                                                            Container(
+                                                              width:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .width *
+                                                                      0.05,
+                                                              height:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .height *
+                                                                      0.04,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: const Color(
+                                                                    0x3308018C),
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                      0x80000000),
+                                                                ),
+                                                              ),
+                                                              child: Align(
+                                                                alignment:
+                                                                    const AlignmentDirectional(
+                                                                        0.0, 0.0),
+                                                                child: Text(
+                                                                  '1',
+                                                                  style: FlutterFlowTheme
+                                                                          .of(context)
+                                                                      .bodyMedium
+                                                                      .override(
+                                                                        fontFamily:
+                                                                            'Inter',
+                                                                        fontSize:
+                                                                            25.0,
+                                                                        letterSpacing:
+                                                                            0.0,
+                                                                        fontWeight:
+                                                                            FontWeight
+                                                                                .w600,
+                                                                      ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                            IndexedText(),
+                                                            IndexedText(),
+                                                            IndexedText(),
+                                                            Container(
+                                                              width:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .width *
+                                                                      0.07,
+                                                              height:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .height *
+                                                                      0.04,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: const Color(
+                                                                    0x66B6B6B6),
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                      0x80000000),
+                                                                  width: 1.0,
+                                                                ),
+                                                              ),
+                                                              child: Align(
+                                                                alignment:
+                                                                    const AlignmentDirectional(
+                                                                        0.0, 0.0),
+                                                                child: Text(
+                                                                  '평균1',
+                                                                  style: FlutterFlowTheme
+                                                                          .of(context)
+                                                                      .bodyMedium
+                                                                      .override(
+                                                                        fontFamily:
+                                                                            'Inter',
+                                                                        fontSize:
+                                                                            23.0,
+                                                                        letterSpacing:
+                                                                            0.0,
+                                                                        fontWeight:
+                                                                            FontWeight
+                                                                                .w600,
+                                                                      ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                        Row(
+                                                          mainAxisSize:
+                                                              MainAxisSize.max,
+                                                          children: [
+                                                            Container(
+                                                              width:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .width *
+                                                                      0.05,
+                                                              height:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .height *
+                                                                      0.04,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: const Color(
+                                                                    0x3308018C),
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                      0x80000000),
+                                                                ),
+                                                              ),
+                                                              child: Align(
+                                                                alignment:
+                                                                    const AlignmentDirectional(
+                                                                        0.0, 0.0),
+                                                                child: Text(
+                                                                  '2',
+                                                                  style: FlutterFlowTheme
+                                                                          .of(context)
+                                                                      .bodyMedium
+                                                                      .override(
+                                                                        fontFamily:
+                                                                            'Inter',
+                                                                        fontSize:
+                                                                            25.0,
+                                                                        letterSpacing:
+                                                                            0.0,
+                                                                        fontWeight:
+                                                                            FontWeight
+                                                                                .w600,
+                                                                      ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                            IndexedText(),
+                                                            IndexedText(),
+                                                            IndexedText(),
+                                                            Container(
+                                                              width:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .width *
+                                                                      0.07,
+                                                              height:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .height *
+                                                                      0.04,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: const Color(
+                                                                    0x66B6B6B6),
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                      0x80000000),
+                                                                  width: 1.0,
+                                                                ),
+                                                              ),
+                                                              child: Align(
+                                                                alignment:
+                                                                    const AlignmentDirectional(
+                                                                        0.0, 0.0),
+                                                                child: Text(
+                                                                  '평균2',
+                                                                  style: FlutterFlowTheme
+                                                                          .of(context)
+                                                                      .bodyMedium
+                                                                      .override(
+                                                                        fontFamily:
+                                                                            'Inter',
+                                                                        fontSize:
+                                                                            23.0,
+                                                                        letterSpacing:
+                                                                            0.0,
+                                                                        fontWeight:
+                                                                            FontWeight
+                                                                                .w600,
+                                                                      ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                        Row(
+                                                          mainAxisSize:
+                                                              MainAxisSize.max,
+                                                          children: [
+                                                            Container(
+                                                              width:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .width *
+                                                                      0.05,
+                                                              height:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .height *
+                                                                      0.04,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: const Color(
+                                                                    0x3308018C),
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                      0x80000000),
+                                                                ),
+                                                              ),
+                                                              child: Align(
+                                                                alignment:
+                                                                    const AlignmentDirectional(
+                                                                        0.0, 0.0),
+                                                                child: Text(
+                                                                  '3',
+                                                                  style: FlutterFlowTheme
+                                                                          .of(context)
+                                                                      .bodyMedium
+                                                                      .override(
+                                                                        fontFamily:
+                                                                            'Inter',
+                                                                        fontSize:
+                                                                            25.0,
+                                                                        letterSpacing:
+                                                                            0.0,
+                                                                        fontWeight:
+                                                                            FontWeight
+                                                                                .w600,
+                                                                      ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                            Container(
+                                                              width:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .width *
+                                                                      0.07,
+                                                              height:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .height *
+                                                                      0.04,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: FlutterFlowTheme
+                                                                        .of(context)
+                                                                    .secondaryBackground,
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                      0x80000000),
+                                                                ),
+                                                              ),
+                                                              child: Align(
+                                                                alignment:
+                                                                    const AlignmentDirectional(
+                                                                        0.0, 0.0),
+                                                                child: Text(
+                                                                  getValue(
+                                                                      Constants
+                                                                          .names[2],
+                                                                      "3",
+                                                                      0),
+                                                                  style: FlutterFlowTheme
+                                                                          .of(context)
+                                                                      .bodyMedium
+                                                                      .override(
+                                                                        fontFamily:
+                                                                            'Inter',
+                                                                        fontSize:
+                                                                            23.0,
+                                                                        letterSpacing:
+                                                                            0.0,
+                                                                        fontWeight:
+                                                                            FontWeight
+                                                                                .w600,
+                                                                      ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                            Container(
+                                                              width:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .width *
+                                                                      0.07,
+                                                              height:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .height *
+                                                                      0.04,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: FlutterFlowTheme
+                                                                        .of(context)
+                                                                    .secondaryBackground,
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                      0x80000000),
+                                                                ),
+                                                              ),
+                                                              child: Align(
+                                                                alignment:
+                                                                    const AlignmentDirectional(
+                                                                        0.0, 0.0),
+                                                                child: Text(
+                                                                  getValue(
+                                                                      Constants
+                                                                          .names[2],
+                                                                      "3",
+                                                                      1),
+                                                                  style: FlutterFlowTheme
+                                                                          .of(context)
+                                                                      .bodyMedium
+                                                                      .override(
+                                                                        fontFamily:
+                                                                            'Inter',
+                                                                        fontSize:
+                                                                            23.0,
+                                                                        letterSpacing:
+                                                                            0.0,
+                                                                        fontWeight:
+                                                                            FontWeight
+                                                                                .w600,
+                                                                      ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                            Container(
+                                                              width:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .width *
+                                                                      0.07,
+                                                              height:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .height *
+                                                                      0.04,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: FlutterFlowTheme
+                                                                        .of(context)
+                                                                    .secondaryBackground,
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                      0x80000000),
+                                                                ),
+                                                              ),
+                                                              child: Align(
+                                                                alignment:
+                                                                    const AlignmentDirectional(
+                                                                        0.0, 0.0),
+                                                                child: Text(
+                                                                  getValue(
+                                                                      Constants
+                                                                          .names[2],
+                                                                      "3",
+                                                                      2),
+                                                                  style: FlutterFlowTheme
+                                                                          .of(context)
+                                                                      .bodyMedium
+                                                                      .override(
+                                                                        fontFamily:
+                                                                            'Inter',
+                                                                        fontSize:
+                                                                            23.0,
+                                                                        letterSpacing:
+                                                                            0.0,
+                                                                        fontWeight:
+                                                                            FontWeight
+                                                                                .w600,
+                                                                      ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                            Container(
+                                                              width:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .width *
+                                                                      0.07,
+                                                              height:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .height *
+                                                                      0.04,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: const Color(
+                                                                    0x66B6B6B6),
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                      0x80000000),
+                                                                  width: 1.0,
+                                                                ),
+                                                              ),
+                                                              child: Align(
+                                                                alignment:
+                                                                    const AlignmentDirectional(
+                                                                        0.0, 0.0),
+                                                                child: Text(
+                                                                  getAverage(
+                                                                      Constants
+                                                                          .names[2],
+                                                                      "3"),
+                                                                  style: FlutterFlowTheme
+                                                                          .of(context)
+                                                                      .bodyMedium
+                                                                      .override(
+                                                                        fontFamily:
+                                                                            'Inter',
+                                                                        fontSize:
+                                                                            23.0,
+                                                                        letterSpacing:
+                                                                            0.0,
+                                                                        fontWeight:
+                                                                            FontWeight
+                                                                                .w600,
+                                                                      ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                        Row(
+                                                          mainAxisSize:
+                                                              MainAxisSize.max,
+                                                          children: [
+                                                            Container(
+                                                              width:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .width *
+                                                                      0.05,
+                                                              height:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .height *
+                                                                      0.04,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: const Color(
+                                                                    0x3308018C),
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                      0x80000000),
+                                                                ),
+                                                              ),
+                                                              child: Align(
+                                                                alignment:
+                                                                    const AlignmentDirectional(
+                                                                        0.0, 0.0),
+                                                                child: Text(
+                                                                  '4',
+                                                                  style: FlutterFlowTheme
+                                                                          .of(context)
+                                                                      .bodyMedium
+                                                                      .override(
+                                                                        fontFamily:
+                                                                            'Inter',
+                                                                        fontSize:
+                                                                            25.0,
+                                                                        letterSpacing:
+                                                                            0.0,
+                                                                        fontWeight:
+                                                                            FontWeight
+                                                                                .w600,
+                                                                      ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                            Container(
+                                                              width:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .width *
+                                                                      0.07,
+                                                              height:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .height *
+                                                                      0.04,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: FlutterFlowTheme
+                                                                        .of(context)
+                                                                    .secondaryBackground,
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                      0x80000000),
+                                                                ),
+                                                              ),
+                                                              child: Align(
+                                                                alignment:
+                                                                    const AlignmentDirectional(
+                                                                        0.0, 0.0),
+                                                                child: Text(
+                                                                  getValue(
+                                                                      Constants
+                                                                          .names[2],
+                                                                      "4",
+                                                                      0),
+                                                                  style: FlutterFlowTheme
+                                                                          .of(context)
+                                                                      .bodyMedium
+                                                                      .override(
+                                                                        fontFamily:
+                                                                            'Inter',
+                                                                        fontSize:
+                                                                            23.0,
+                                                                        letterSpacing:
+                                                                            0.0,
+                                                                        fontWeight:
+                                                                            FontWeight
+                                                                                .w600,
+                                                                      ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                            Container(
+                                                              width:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .width *
+                                                                      0.07,
+                                                              height:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .height *
+                                                                      0.04,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: FlutterFlowTheme
+                                                                        .of(context)
+                                                                    .secondaryBackground,
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                      0x80000000),
+                                                                ),
+                                                              ),
+                                                              child: Align(
+                                                                alignment:
+                                                                    const AlignmentDirectional(
+                                                                        0.0, 0.0),
+                                                                child: Text(
+                                                                  getValue(
+                                                                      Constants
+                                                                          .names[2],
+                                                                      "4",
+                                                                      1),
+                                                                  style: FlutterFlowTheme
+                                                                          .of(context)
+                                                                      .bodyMedium
+                                                                      .override(
+                                                                        fontFamily:
+                                                                            'Inter',
+                                                                        fontSize:
+                                                                            23.0,
+                                                                        letterSpacing:
+                                                                            0.0,
+                                                                        fontWeight:
+                                                                            FontWeight
+                                                                                .w600,
+                                                                      ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                            Container(
+                                                              width:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .width *
+                                                                      0.07,
+                                                              height:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .height *
+                                                                      0.04,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: FlutterFlowTheme
+                                                                        .of(context)
+                                                                    .secondaryBackground,
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                      0x80000000),
+                                                                ),
+                                                              ),
+                                                              child: Align(
+                                                                alignment:
+                                                                    const AlignmentDirectional(
+                                                                        0.0, 0.0),
+                                                                child: Text(
+                                                                  getValue(
+                                                                      Constants
+                                                                          .names[2],
+                                                                      "4",
+                                                                      2),
+                                                                  style: FlutterFlowTheme
+                                                                          .of(context)
+                                                                      .bodyMedium
+                                                                      .override(
+                                                                        fontFamily:
+                                                                            'Inter',
+                                                                        fontSize:
+                                                                            23.0,
+                                                                        letterSpacing:
+                                                                            0.0,
+                                                                        fontWeight:
+                                                                            FontWeight
+                                                                                .w600,
+                                                                      ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                            Container(
+                                                              width:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .width *
+                                                                      0.07,
+                                                              height:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .height *
+                                                                      0.04,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: const Color(
+                                                                    0x66B6B6B6),
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                      0x80000000),
+                                                                  width: 1.0,
+                                                                ),
+                                                              ),
+                                                              child: Align(
+                                                                alignment:
+                                                                    const AlignmentDirectional(
+                                                                        0.0, 0.0),
+                                                                child: Text(
+                                                                  getAverage(
+                                                                      Constants
+                                                                          .names[2],
+                                                                      "4"),
+                                                                  style: FlutterFlowTheme
+                                                                          .of(context)
+                                                                      .bodyMedium
+                                                                      .override(
+                                                                        fontFamily:
+                                                                            'Inter',
+                                                                        fontSize:
+                                                                            23.0,
+                                                                        letterSpacing:
+                                                                            0.0,
+                                                                        fontWeight:
+                                                                            FontWeight
+                                                                                .w600,
+                                                                      ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                        Row(
+                                                          mainAxisSize:
+                                                              MainAxisSize.max,
+                                                          children: [
+                                                            Container(
+                                                              width:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .width *
+                                                                      0.05,
+                                                              height:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .height *
+                                                                      0.04,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: const Color(
+                                                                    0x3308018C),
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                      0x80000000),
+                                                                ),
+                                                              ),
+                                                              child: Align(
+                                                                alignment:
+                                                                    const AlignmentDirectional(
+                                                                        0.0, 0.0),
+                                                                child: Text(
+                                                                  '5',
+                                                                  style: FlutterFlowTheme
+                                                                          .of(context)
+                                                                      .bodyMedium
+                                                                      .override(
+                                                                        fontFamily:
+                                                                            'Inter',
+                                                                        fontSize:
+                                                                            25.0,
+                                                                        letterSpacing:
+                                                                            0.0,
+                                                                        fontWeight:
+                                                                            FontWeight
+                                                                                .w600,
+                                                                      ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                            IndexedText(),
+                                                            IndexedText(),
+                                                            IndexedText(),
+                                                            Container(
+                                                              width:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .width *
+                                                                      0.07,
+                                                              height:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .height *
+                                                                      0.04,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: const Color(
+                                                                    0x66B6B6B6),
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                      0x80000000),
+                                                                  width: 1.0,
+                                                                ),
+                                                              ),
+                                                              child: Align(
+                                                                alignment:
+                                                                    const AlignmentDirectional(
+                                                                        0.0, 0.0),
+                                                                child: Text(
+                                                                  '평균5',
+                                                                  style: FlutterFlowTheme
+                                                                          .of(context)
+                                                                      .bodyMedium
+                                                                      .override(
+                                                                        fontFamily:
+                                                                            'Inter',
+                                                                        fontSize:
+                                                                            23.0,
+                                                                        letterSpacing:
+                                                                            0.0,
+                                                                        fontWeight:
+                                                                            FontWeight
+                                                                                .w600,
+                                                                      ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                        Row(
+                                                          mainAxisSize:
+                                                              MainAxisSize.max,
+                                                          children: [
+                                                            Container(
+                                                              width:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .width *
+                                                                      0.05,
+                                                              height:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .height *
+                                                                      0.04,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: const Color(
+                                                                    0x3308018C),
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                      0x80000000),
+                                                                ),
+                                                              ),
+                                                              child: Align(
+                                                                alignment:
+                                                                    const AlignmentDirectional(
+                                                                        0.0, 0.0),
+                                                                child: Text(
+                                                                  '6',
+                                                                  style: FlutterFlowTheme
+                                                                          .of(context)
+                                                                      .bodyMedium
+                                                                      .override(
+                                                                        fontFamily:
+                                                                            'Inter',
+                                                                        fontSize:
+                                                                            25.0,
+                                                                        letterSpacing:
+                                                                            0.0,
+                                                                        fontWeight:
+                                                                            FontWeight
+                                                                                .w600,
+                                                                      ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                            IndexedText(),
+                                                            IndexedText(),
+                                                            IndexedText(),
+                                                            Container(
+                                                              width:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .width *
+                                                                      0.07,
+                                                              height:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .height *
+                                                                      0.04,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: const Color(
+                                                                    0x66B6B6B6),
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                      0x80000000),
+                                                                  width: 1.0,
+                                                                ),
+                                                              ),
+                                                              child: Align(
+                                                                alignment:
+                                                                    const AlignmentDirectional(
+                                                                        0.0, 0.0),
+                                                                child: Text(
+                                                                  '평균6',
+                                                                  style: FlutterFlowTheme
+                                                                          .of(context)
+                                                                      .bodyMedium
+                                                                      .override(
+                                                                        fontFamily:
+                                                                            'Inter',
+                                                                        fontSize:
+                                                                            23.0,
+                                                                        letterSpacing:
+                                                                            0.0,
+                                                                        fontWeight:
+                                                                            FontWeight
+                                                                                .w600,
+                                                                      ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                        Row(
+                                                          mainAxisSize:
+                                                              MainAxisSize.max,
+                                                          children: [
+                                                            Container(
+                                                              width:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .width *
+                                                                      0.05,
+                                                              height:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .height *
+                                                                      0.045,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: const Color(
+                                                                    0xFF08018C),
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                      0x80000000),
+                                                                ),
+                                                              ),
+                                                              child: Align(
+                                                                alignment:
+                                                                    const AlignmentDirectional(
+                                                                        0.0, 0.0),
+                                                                child: Text(
+                                                                  '불량',
+                                                                  style: FlutterFlowTheme
+                                                                          .of(context)
+                                                                      .bodyMedium
+                                                                      .override(
+                                                                        fontFamily:
+                                                                            'Inter',
+                                                                        color: Colors
+                                                                            .white,
+                                                                        fontSize:
+                                                                            23.0,
+                                                                        letterSpacing:
+                                                                            0.0,
+                                                                        fontWeight:
+                                                                            FontWeight
+                                                                                .w600,
+                                                                      ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                            Container(
+                                                              width:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .width *
+                                                                      0.1,
+                                                              height:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .height *
+                                                                      0.045,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: FlutterFlowTheme
+                                                                        .of(context)
+                                                                    .secondaryBackground,
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                      0x80000000),
+                                                                ),
+                                                              ),
+                                                              child: Align(
+                                                                alignment:
+                                                                    const AlignmentDirectional(
+                                                                        -1.0, 0.0),
+                                                                child: Padding(
+                                                                  padding:
+                                                                      const EdgeInsetsDirectional
+                                                                          .fromSTEB(
+                                                                              8.0,
+                                                                              0.0,
+                                                                              0.0,
+                                                                              0.0),
+                                                                  child: Text(
+                                                                    '수량:',
+                                                                    textAlign:
+                                                                        TextAlign
+                                                                            .center,
+                                                                    style: FlutterFlowTheme.of(
+                                                                            context)
+                                                                        .bodyMedium
+                                                                        .override(
+                                                                          fontFamily:
+                                                                              'Inter',
+                                                                          fontSize:
+                                                                              23.0,
+                                                                          letterSpacing:
+                                                                              0.0,
+                                                                          fontWeight:
+                                                                              FontWeight
+                                                                                  .w600,
+                                                                        ),
+                                                                  ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                            Container(
+                                                              width:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .width *
+                                                                      0.18,
+                                                              height:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .height *
+                                                                      0.045,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: FlutterFlowTheme
+                                                                        .of(context)
+                                                                    .secondaryBackground,
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                      0x80000000),
+                                                                ),
+                                                              ),
+                                                              child: Align(
+                                                                alignment:
+                                                                    const AlignmentDirectional(
+                                                                        -1.0, 0.0),
+                                                                child: Padding(
+                                                                  padding:
+                                                                      const EdgeInsetsDirectional
+                                                                          .fromSTEB(
+                                                                              8.0,
+                                                                              0.0,
+                                                                              0.0,
+                                                                              0.0),
+                                                                  child: Text(
+                                                                    '양품 수량:',
+                                                                    style: FlutterFlowTheme.of(
+                                                                            context)
+                                                                        .bodyMedium
+                                                                        .override(
+                                                                          fontFamily:
+                                                                              'Inter',
+                                                                          fontSize:
+                                                                              23.0,
+                                                                          letterSpacing:
+                                                                              0.0,
+                                                                          fontWeight:
+                                                                              FontWeight
+                                                                                  .w600,
+                                                                        ),
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
                                                   ),
-                                                ),
-                                                child: Column(
-                                                  mainAxisSize:
-                                                      MainAxisSize.max,
-                                                  children: [
-                                                    Row(
-                                                      mainAxisSize:
-                                                          MainAxisSize.max,
-                                                      children: [
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.05,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: const Color(
-                                                                0xFF08018C),
-                                                            border: Border.all(
-                                                              color: const Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                const AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              'NO.',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    color: Colors
-                                                                        .white,
-                                                                    fontSize:
-                                                                        25.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: const Color(
-                                                                0xFF08018C),
-                                                            border: Border.all(
-                                                              color: const Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                const AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '초',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    color: Colors
-                                                                        .white,
-                                                                    fontSize:
-                                                                        25.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: const Color(
-                                                                0xFF08018C),
-                                                            border: Border.all(
-                                                              color: const Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                const AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '중',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    color: Colors
-                                                                        .white,
-                                                                    fontSize:
-                                                                        25.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: const Color(
-                                                                0xFF08018C),
-                                                            border: Border.all(
-                                                              color: const Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                const AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '종',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    color: Colors
-                                                                        .white,
-                                                                    fontSize:
-                                                                        25.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: const Color(
-                                                                0xFF08018C),
-                                                            border: Border.all(
-                                                              color: const Color(
-                                                                  0x80000000),
-                                                              width: 2.0,
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                const AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '평균',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    color: Colors
-                                                                        .white,
-                                                                    fontSize:
-                                                                        25.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                    Row(
-                                                      mainAxisSize:
-                                                          MainAxisSize.max,
-                                                      children: [
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.05,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: const Color(
-                                                                0x3308018C),
-                                                            border: Border.all(
-                                                              color: const Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                const AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '1',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        25.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        IndexedText(),
-                                                        IndexedText(),
-                                                        IndexedText(),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: const Color(
-                                                                0x66B6B6B6),
-                                                            border: Border.all(
-                                                              color: const Color(
-                                                                  0x80000000),
-                                                              width: 1.0,
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                const AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '평균1',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                    Row(
-                                                      mainAxisSize:
-                                                          MainAxisSize.max,
-                                                      children: [
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.05,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: const Color(
-                                                                0x3308018C),
-                                                            border: Border.all(
-                                                              color: const Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                const AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '2',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        25.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        IndexedText(),
-                                                        IndexedText(),
-                                                        IndexedText(),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: const Color(
-                                                                0x66B6B6B6),
-                                                            border: Border.all(
-                                                              color: const Color(
-                                                                  0x80000000),
-                                                              width: 1.0,
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                const AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '평균2',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                    Row(
-                                                      mainAxisSize:
-                                                          MainAxisSize.max,
-                                                      children: [
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.05,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: const Color(
-                                                                0x3308018C),
-                                                            border: Border.all(
-                                                              color: const Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                const AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '3',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        25.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: FlutterFlowTheme
-                                                                    .of(context)
-                                                                .secondaryBackground,
-                                                            border: Border.all(
-                                                              color: const Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                const AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              getValue(
-                                                                  Constants
-                                                                      .names[2],
-                                                                  "3",
-                                                                  0),
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: FlutterFlowTheme
-                                                                    .of(context)
-                                                                .secondaryBackground,
-                                                            border: Border.all(
-                                                              color: const Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                const AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              getValue(
-                                                                  Constants
-                                                                      .names[2],
-                                                                  "3",
-                                                                  1),
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: FlutterFlowTheme
-                                                                    .of(context)
-                                                                .secondaryBackground,
-                                                            border: Border.all(
-                                                              color: const Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                const AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              getValue(
-                                                                  Constants
-                                                                      .names[2],
-                                                                  "3",
-                                                                  2),
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: const Color(
-                                                                0x66B6B6B6),
-                                                            border: Border.all(
-                                                              color: const Color(
-                                                                  0x80000000),
-                                                              width: 1.0,
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                const AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              getAverage(
-                                                                  Constants
-                                                                      .names[2],
-                                                                  "3"),
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                    Row(
-                                                      mainAxisSize:
-                                                          MainAxisSize.max,
-                                                      children: [
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.05,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: const Color(
-                                                                0x3308018C),
-                                                            border: Border.all(
-                                                              color: const Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                const AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '4',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        25.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: FlutterFlowTheme
-                                                                    .of(context)
-                                                                .secondaryBackground,
-                                                            border: Border.all(
-                                                              color: const Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                const AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              getValue(
-                                                                  Constants
-                                                                      .names[2],
-                                                                  "4",
-                                                                  0),
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: FlutterFlowTheme
-                                                                    .of(context)
-                                                                .secondaryBackground,
-                                                            border: Border.all(
-                                                              color: const Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                const AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              getValue(
-                                                                  Constants
-                                                                      .names[2],
-                                                                  "4",
-                                                                  1),
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: FlutterFlowTheme
-                                                                    .of(context)
-                                                                .secondaryBackground,
-                                                            border: Border.all(
-                                                              color: const Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                const AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              getValue(
-                                                                  Constants
-                                                                      .names[2],
-                                                                  "4",
-                                                                  2),
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: const Color(
-                                                                0x66B6B6B6),
-                                                            border: Border.all(
-                                                              color: const Color(
-                                                                  0x80000000),
-                                                              width: 1.0,
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                const AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              getAverage(
-                                                                  Constants
-                                                                      .names[2],
-                                                                  "4"),
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                    Row(
-                                                      mainAxisSize:
-                                                          MainAxisSize.max,
-                                                      children: [
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.05,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: const Color(
-                                                                0x3308018C),
-                                                            border: Border.all(
-                                                              color: const Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                const AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '5',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        25.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        IndexedText(),
-                                                        IndexedText(),
-                                                        IndexedText(),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: const Color(
-                                                                0x66B6B6B6),
-                                                            border: Border.all(
-                                                              color: const Color(
-                                                                  0x80000000),
-                                                              width: 1.0,
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                const AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '평균5',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                    Row(
-                                                      mainAxisSize:
-                                                          MainAxisSize.max,
-                                                      children: [
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.05,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: const Color(
-                                                                0x3308018C),
-                                                            border: Border.all(
-                                                              color: const Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                const AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '6',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        25.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        IndexedText(),
-                                                        IndexedText(),
-                                                        IndexedText(),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: const Color(
-                                                                0x66B6B6B6),
-                                                            border: Border.all(
-                                                              color: const Color(
-                                                                  0x80000000),
-                                                              width: 1.0,
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                const AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '평균6',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                    Row(
-                                                      mainAxisSize:
-                                                          MainAxisSize.max,
-                                                      children: [
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.05,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.045,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: const Color(
-                                                                0xFF08018C),
-                                                            border: Border.all(
-                                                              color: const Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                const AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '불량',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    color: Colors
-                                                                        .white,
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.1,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.045,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: FlutterFlowTheme
-                                                                    .of(context)
-                                                                .secondaryBackground,
-                                                            border: Border.all(
-                                                              color: const Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                const AlignmentDirectional(
-                                                                    -1.0, 0.0),
-                                                            child: Padding(
-                                                              padding:
-                                                                  const EdgeInsetsDirectional
-                                                                      .fromSTEB(
-                                                                          8.0,
-                                                                          0.0,
-                                                                          0.0,
-                                                                          0.0),
-                                                              child: Text(
-                                                                '수량:',
-                                                                textAlign:
-                                                                    TextAlign
-                                                                        .center,
-                                                                style: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .bodyMedium
-                                                                    .override(
-                                                                      fontFamily:
-                                                                          'Inter',
-                                                                      fontSize:
-                                                                          23.0,
-                                                                      letterSpacing:
-                                                                          0.0,
-                                                                      fontWeight:
-                                                                          FontWeight
-                                                                              .w600,
-                                                                    ),
-                                                              ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.18,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.045,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: FlutterFlowTheme
-                                                                    .of(context)
-                                                                .secondaryBackground,
-                                                            border: Border.all(
-                                                              color: const Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                const AlignmentDirectional(
-                                                                    -1.0, 0.0),
-                                                            child: Padding(
-                                                              padding:
-                                                                  const EdgeInsetsDirectional
-                                                                      .fromSTEB(
-                                                                          8.0,
-                                                                          0.0,
-                                                                          0.0,
-                                                                          0.0),
-                                                              child: Text(
-                                                                '양품 수량:',
-                                                                style: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .bodyMedium
-                                                                    .override(
-                                                                      fontFamily:
-                                                                          'Inter',
-                                                                      fontSize:
-                                                                          23.0,
-                                                                      letterSpacing:
-                                                                          0.0,
-                                                                      fontWeight:
-                                                                          FontWeight
-                                                                              .w600,
-                                                                    ),
-                                                              ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
+                                                const DownloadButton()
+                                              ].addToStart(
+                                                  const SizedBox(width: 40.0)),
                                             ),
                                           ],
                                         ),
@@ -8132,6 +8161,8 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                 ),
                               ],
                             ),
+                            //-----표3번끝------------------------------------------------------------------
+
                             Column(
                               mainAxisSize: MainAxisSize.max,
                               children: [
@@ -9120,7 +9151,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                   width:
                                                       MediaQuery.sizeOf(context)
                                                               .width *
-                                                          0.36,
+                                                          0.362,
                                                   height:
                                                       MediaQuery.sizeOf(context)
                                                               .height *
@@ -9558,1146 +9589,1160 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                 ),
                                               ),
                                             ),
-                                            Padding(
-                                              padding: const EdgeInsetsDirectional
-                                                  .fromSTEB(2.0, 2.0, 2.0, 2.0),
-                                              child: Container(
-                                                width:
-                                                    MediaQuery.sizeOf(context)
-                                                            .width *
-                                                        0.332,
-                                                height:
-                                                    MediaQuery.sizeOf(context)
-                                                            .height *
-                                                        0.329,
-                                                decoration: BoxDecoration(
-                                                  color: FlutterFlowTheme.of(
-                                                          context)
-                                                      .secondaryBackground,
-                                                  border: Border.all(
-                                                    color: Colors.white,
-                                                    width: 0.0,
-                                                  ),
-                                                ),
-                                                child: Column(
-                                                  mainAxisSize:
-                                                      MainAxisSize.max,
-                                                  children: [
-                                                    Row(
-                                                      mainAxisSize:
-                                                          MainAxisSize.max,
-                                                      children: [
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.05,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: const Color(
-                                                                0xFF08018C),
-                                                            border: Border.all(
-                                                              color: const Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                const AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              'NO.',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    color: Colors
-                                                                        .white,
-                                                                    fontSize:
-                                                                        25.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: const Color(
-                                                                0xFF08018C),
-                                                            border: Border.all(
-                                                              color: const Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                const AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '초',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    color: Colors
-                                                                        .white,
-                                                                    fontSize:
-                                                                        25.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: const Color(
-                                                                0xFF08018C),
-                                                            border: Border.all(
-                                                              color: const Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                const AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '중',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    color: Colors
-                                                                        .white,
-                                                                    fontSize:
-                                                                        25.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: const Color(
-                                                                0xFF08018C),
-                                                            border: Border.all(
-                                                              color: const Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                const AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '종',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    color: Colors
-                                                                        .white,
-                                                                    fontSize:
-                                                                        25.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: const Color(
-                                                                0xFF08018C),
-                                                            border: Border.all(
-                                                              color: const Color(
-                                                                  0x80000000),
-                                                              width: 2.0,
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                const AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '평균',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    color: Colors
-                                                                        .white,
-                                                                    fontSize:
-                                                                        25.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ],
+
+                                            //-----표4번시작------------------------------------------------
+                                            Row(
+                                              mainAxisSize: MainAxisSize.max,
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.end,
+                                              children: [      
+                                                Padding(
+                                                  padding: const EdgeInsetsDirectional
+                                                      .fromSTEB(2.0, 2.0, 2.0, 2.0),
+                                                  child: Container(
+                                                    width:
+                                                        MediaQuery.sizeOf(context)
+                                                                .width *
+                                                            0.332,
+                                                    height:
+                                                        MediaQuery.sizeOf(context)
+                                                                .height *
+                                                            0.329,
+                                                    decoration: BoxDecoration(
+                                                      color: FlutterFlowTheme.of(
+                                                              context)
+                                                          .secondaryBackground,
+                                                      border: Border.all(
+                                                        color: Colors.white,
+                                                        width: 0.0,
+                                                      ),
                                                     ),
-                                                    Row(
+                                                    child: Column(
                                                       mainAxisSize:
                                                           MainAxisSize.max,
                                                       children: [
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.05,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: const Color(
-                                                                0x3308018C),
-                                                            border: Border.all(
-                                                              color: const Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                const AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '1',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        25.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        IndexedText(),
-                                                        IndexedText(),
-                                                        IndexedText(),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: const Color(
-                                                                0x66B6B6B6),
-                                                            border: Border.all(
-                                                              color: const Color(
-                                                                  0x80000000),
-                                                              width: 1.0,
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                const AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '평균1',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                    Row(
-                                                      mainAxisSize:
-                                                          MainAxisSize.max,
-                                                      children: [
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.05,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: const Color(
-                                                                0x3308018C),
-                                                            border: Border.all(
-                                                              color: const Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                const AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '2',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        25.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        IndexedText(),
-                                                        IndexedText(),
-                                                        IndexedText(),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: const Color(
-                                                                0x66B6B6B6),
-                                                            border: Border.all(
-                                                              color: const Color(
-                                                                  0x80000000),
-                                                              width: 1.0,
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                const AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '평균2',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                    Row(
-                                                      mainAxisSize:
-                                                          MainAxisSize.max,
-                                                      children: [
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.05,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: const Color(
-                                                                0x3308018C),
-                                                            border: Border.all(
-                                                              color: const Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                const AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '3',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        25.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: FlutterFlowTheme
-                                                                    .of(context)
-                                                                .secondaryBackground,
-                                                            border: Border.all(
-                                                              color: const Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                const AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              getValue(
-                                                                  Constants
-                                                                      .names[3],
-                                                                  "3",
-                                                                  0),
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: FlutterFlowTheme
-                                                                    .of(context)
-                                                                .secondaryBackground,
-                                                            border: Border.all(
-                                                              color: const Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                const AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              getValue(
-                                                                  Constants
-                                                                      .names[3],
-                                                                  "3",
-                                                                  1),
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: FlutterFlowTheme
-                                                                    .of(context)
-                                                                .secondaryBackground,
-                                                            border: Border.all(
-                                                              color: const Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                const AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              getValue(
-                                                                  Constants
-                                                                      .names[3],
-                                                                  "3",
-                                                                  2),
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: const Color(
-                                                                0x66B6B6B6),
-                                                            border: Border.all(
-                                                              color: const Color(
-                                                                  0x80000000),
-                                                              width: 1.0,
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                const AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              getAverage(
-                                                                  Constants
-                                                                      .names[3],
-                                                                  "3"),
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                    Row(
-                                                      mainAxisSize:
-                                                          MainAxisSize.max,
-                                                      children: [
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.05,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: const Color(
-                                                                0x3308018C),
-                                                            border: Border.all(
-                                                              color: const Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                const AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '4',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        25.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        IndexedText(),
-                                                        IndexedText(),
-                                                        IndexedText(),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: const Color(
-                                                                0x66B6B6B6),
-                                                            border: Border.all(
-                                                              color: const Color(
-                                                                  0x80000000),
-                                                              width: 1.0,
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                const AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '평균4',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                    Row(
-                                                      mainAxisSize:
-                                                          MainAxisSize.max,
-                                                      children: [
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.05,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: const Color(
-                                                                0x3308018C),
-                                                            border: Border.all(
-                                                              color: const Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                const AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '5',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        25.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        IndexedText(),
-                                                        IndexedText(),
-                                                        IndexedText(),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: const Color(
-                                                                0x66B6B6B6),
-                                                            border: Border.all(
-                                                              color: const Color(
-                                                                  0x80000000),
-                                                              width: 1.0,
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                const AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '평균5',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                    Row(
-                                                      mainAxisSize:
-                                                          MainAxisSize.max,
-                                                      children: [
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.05,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: const Color(
-                                                                0x3308018C),
-                                                            border: Border.all(
-                                                              color: const Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                const AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '6',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        25.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        IndexedText(),
-                                                        IndexedText(),
-                                                        IndexedText(),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.07,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.04,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: const Color(
-                                                                0x66B6B6B6),
-                                                            border: Border.all(
-                                                              color: const Color(
-                                                                  0x80000000),
-                                                              width: 1.0,
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                const AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '평균6',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                    Row(
-                                                      mainAxisSize:
-                                                          MainAxisSize.max,
-                                                      children: [
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.05,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.045,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: const Color(
-                                                                0xFF08018C),
-                                                            border: Border.all(
-                                                              color: const Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                const AlignmentDirectional(
-                                                                    0.0, 0.0),
-                                                            child: Text(
-                                                              '불량',
-                                                              style: FlutterFlowTheme
-                                                                      .of(context)
-                                                                  .bodyMedium
-                                                                  .override(
-                                                                    fontFamily:
-                                                                        'Inter',
-                                                                    color: Colors
-                                                                        .white,
-                                                                    fontSize:
-                                                                        23.0,
-                                                                    letterSpacing:
-                                                                        0.0,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.1,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.045,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: FlutterFlowTheme
-                                                                    .of(context)
-                                                                .secondaryBackground,
-                                                            border: Border.all(
-                                                              color: const Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                const AlignmentDirectional(
-                                                                    -1.0, 0.0),
-                                                            child: Padding(
-                                                              padding:
-                                                                  const EdgeInsetsDirectional
-                                                                      .fromSTEB(
-                                                                          8.0,
-                                                                          0.0,
-                                                                          0.0,
-                                                                          0.0),
-                                                              child: Text(
-                                                                '수량:',
-                                                                textAlign:
-                                                                    TextAlign
-                                                                        .center,
-                                                                style: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .bodyMedium
-                                                                    .override(
-                                                                      fontFamily:
-                                                                          'Inter',
-                                                                      fontSize:
-                                                                          23.0,
-                                                                      letterSpacing:
-                                                                          0.0,
-                                                                      fontWeight:
-                                                                          FontWeight
-                                                                              .w600,
-                                                                    ),
+                                                        Row(
+                                                          mainAxisSize:
+                                                              MainAxisSize.max,
+                                                          children: [
+                                                            Container(
+                                                              width:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .width *
+                                                                      0.05,
+                                                              height:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .height *
+                                                                      0.04,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: const Color(
+                                                                    0xFF08018C),
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                      0x80000000),
+                                                                ),
+                                                              ),
+                                                              child: Align(
+                                                                alignment:
+                                                                    const AlignmentDirectional(
+                                                                        0.0, 0.0),
+                                                                child: Text(
+                                                                  'NO.',
+                                                                  style: FlutterFlowTheme
+                                                                          .of(context)
+                                                                      .bodyMedium
+                                                                      .override(
+                                                                        fontFamily:
+                                                                            'Inter',
+                                                                        color: Colors
+                                                                            .white,
+                                                                        fontSize:
+                                                                            25.0,
+                                                                        letterSpacing:
+                                                                            0.0,
+                                                                        fontWeight:
+                                                                            FontWeight
+                                                                                .w600,
+                                                                      ),
+                                                                ),
                                                               ),
                                                             ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          width:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .width *
-                                                                  0.18,
-                                                          height:
-                                                              MediaQuery.sizeOf(
-                                                                          context)
-                                                                      .height *
-                                                                  0.045,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: FlutterFlowTheme
-                                                                    .of(context)
-                                                                .secondaryBackground,
-                                                            border: Border.all(
-                                                              color: const Color(
-                                                                  0x80000000),
-                                                            ),
-                                                          ),
-                                                          child: Align(
-                                                            alignment:
-                                                                const AlignmentDirectional(
-                                                                    -1.0, 0.0),
-                                                            child: Padding(
-                                                              padding:
-                                                                  const EdgeInsetsDirectional
-                                                                      .fromSTEB(
-                                                                          8.0,
-                                                                          0.0,
-                                                                          0.0,
-                                                                          0.0),
-                                                              child: Text(
-                                                                '양품 수량:',
-                                                                style: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .bodyMedium
-                                                                    .override(
-                                                                      fontFamily:
-                                                                          'Inter',
-                                                                      fontSize:
-                                                                          23.0,
-                                                                      letterSpacing:
-                                                                          0.0,
-                                                                      fontWeight:
-                                                                          FontWeight
-                                                                              .w600,
-                                                                    ),
+                                                            Container(
+                                                              width:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .width *
+                                                                      0.07,
+                                                              height:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .height *
+                                                                      0.04,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: const Color(
+                                                                    0xFF08018C),
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                      0x80000000),
+                                                                ),
+                                                              ),
+                                                              child: Align(
+                                                                alignment:
+                                                                    const AlignmentDirectional(
+                                                                        0.0, 0.0),
+                                                                child: Text(
+                                                                  '초',
+                                                                  style: FlutterFlowTheme
+                                                                          .of(context)
+                                                                      .bodyMedium
+                                                                      .override(
+                                                                        fontFamily:
+                                                                            'Inter',
+                                                                        color: Colors
+                                                                            .white,
+                                                                        fontSize:
+                                                                            25.0,
+                                                                        letterSpacing:
+                                                                            0.0,
+                                                                        fontWeight:
+                                                                            FontWeight
+                                                                                .w600,
+                                                                      ),
+                                                                ),
                                                               ),
                                                             ),
-                                                          ),
+                                                            Container(
+                                                              width:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .width *
+                                                                      0.07,
+                                                              height:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .height *
+                                                                      0.04,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: const Color(
+                                                                    0xFF08018C),
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                      0x80000000),
+                                                                ),
+                                                              ),
+                                                              child: Align(
+                                                                alignment:
+                                                                    const AlignmentDirectional(
+                                                                        0.0, 0.0),
+                                                                child: Text(
+                                                                  '중',
+                                                                  style: FlutterFlowTheme
+                                                                          .of(context)
+                                                                      .bodyMedium
+                                                                      .override(
+                                                                        fontFamily:
+                                                                            'Inter',
+                                                                        color: Colors
+                                                                            .white,
+                                                                        fontSize:
+                                                                            25.0,
+                                                                        letterSpacing:
+                                                                            0.0,
+                                                                        fontWeight:
+                                                                            FontWeight
+                                                                                .w600,
+                                                                      ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                            Container(
+                                                              width:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .width *
+                                                                      0.07,
+                                                              height:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .height *
+                                                                      0.04,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: const Color(
+                                                                    0xFF08018C),
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                      0x80000000),
+                                                                ),
+                                                              ),
+                                                              child: Align(
+                                                                alignment:
+                                                                    const AlignmentDirectional(
+                                                                        0.0, 0.0),
+                                                                child: Text(
+                                                                  '종',
+                                                                  style: FlutterFlowTheme
+                                                                          .of(context)
+                                                                      .bodyMedium
+                                                                      .override(
+                                                                        fontFamily:
+                                                                            'Inter',
+                                                                        color: Colors
+                                                                            .white,
+                                                                        fontSize:
+                                                                            25.0,
+                                                                        letterSpacing:
+                                                                            0.0,
+                                                                        fontWeight:
+                                                                            FontWeight
+                                                                                .w600,
+                                                                      ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                            Container(
+                                                              width:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .width *
+                                                                      0.07,
+                                                              height:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .height *
+                                                                      0.04,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: const Color(
+                                                                    0xFF08018C),
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                      0x80000000),
+                                                                  width: 2.0,
+                                                                ),
+                                                              ),
+                                                              child: Align(
+                                                                alignment:
+                                                                    const AlignmentDirectional(
+                                                                        0.0, 0.0),
+                                                                child: Text(
+                                                                  '평균',
+                                                                  style: FlutterFlowTheme
+                                                                          .of(context)
+                                                                      .bodyMedium
+                                                                      .override(
+                                                                        fontFamily:
+                                                                            'Inter',
+                                                                        color: Colors
+                                                                            .white,
+                                                                        fontSize:
+                                                                            25.0,
+                                                                        letterSpacing:
+                                                                            0.0,
+                                                                        fontWeight:
+                                                                            FontWeight
+                                                                                .w600,
+                                                                      ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ],
                                                         ),
-                                                      ],
-                                                    ),
-                                                  ],
+                                                        Row(
+                                                          mainAxisSize:
+                                                              MainAxisSize.max,
+                                                          children: [
+                                                            Container(
+                                                              width:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .width *
+                                                                      0.05,
+                                                              height:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .height *
+                                                                      0.04,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: const Color(
+                                                                    0x3308018C),
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                      0x80000000),
+                                                                ),
+                                                              ),
+                                                              child: Align(
+                                                                alignment:
+                                                                    const AlignmentDirectional(
+                                                                        0.0, 0.0),
+                                                                child: Text(
+                                                                  '1',
+                                                                  style: FlutterFlowTheme
+                                                                          .of(context)
+                                                                      .bodyMedium
+                                                                      .override(
+                                                                        fontFamily:
+                                                                            'Inter',
+                                                                        fontSize:
+                                                                            25.0,
+                                                                        letterSpacing:
+                                                                            0.0,
+                                                                        fontWeight:
+                                                                            FontWeight
+                                                                                .w600,
+                                                                      ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                            IndexedText(),
+                                                            IndexedText(),
+                                                            IndexedText(),
+                                                            Container(
+                                                              width:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .width *
+                                                                      0.07,
+                                                              height:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .height *
+                                                                      0.04,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: const Color(
+                                                                    0x66B6B6B6),
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                      0x80000000),
+                                                                  width: 1.0,
+                                                                ),
+                                                              ),
+                                                              child: Align(
+                                                                alignment:
+                                                                    const AlignmentDirectional(
+                                                                        0.0, 0.0),
+                                                                child: Text(
+                                                                  '평균1',
+                                                                  style: FlutterFlowTheme
+                                                                          .of(context)
+                                                                      .bodyMedium
+                                                                      .override(
+                                                                        fontFamily:
+                                                                            'Inter',
+                                                                        fontSize:
+                                                                            23.0,
+                                                                        letterSpacing:
+                                                                            0.0,
+                                                                        fontWeight:
+                                                                            FontWeight
+                                                                                .w600,
+                                                                      ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                        Row(
+                                                          mainAxisSize:
+                                                              MainAxisSize.max,
+                                                          children: [
+                                                            Container(
+                                                              width:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .width *
+                                                                      0.05,
+                                                              height:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .height *
+                                                                      0.04,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: const Color(
+                                                                    0x3308018C),
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                      0x80000000),
+                                                                ),
+                                                              ),
+                                                              child: Align(
+                                                                alignment:
+                                                                    const AlignmentDirectional(
+                                                                        0.0, 0.0),
+                                                                child: Text(
+                                                                  '2',
+                                                                  style: FlutterFlowTheme
+                                                                          .of(context)
+                                                                      .bodyMedium
+                                                                      .override(
+                                                                        fontFamily:
+                                                                            'Inter',
+                                                                        fontSize:
+                                                                            25.0,
+                                                                        letterSpacing:
+                                                                            0.0,
+                                                                        fontWeight:
+                                                                            FontWeight
+                                                                                .w600,
+                                                                      ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                            IndexedText(),
+                                                            IndexedText(),
+                                                            IndexedText(),
+                                                            Container(
+                                                              width:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .width *
+                                                                      0.07,
+                                                              height:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .height *
+                                                                      0.04,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: const Color(
+                                                                    0x66B6B6B6),
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                      0x80000000),
+                                                                  width: 1.0,
+                                                                ),
+                                                              ),
+                                                              child: Align(
+                                                                alignment:
+                                                                    const AlignmentDirectional(
+                                                                        0.0, 0.0),
+                                                                child: Text(
+                                                                  '평균2',
+                                                                  style: FlutterFlowTheme
+                                                                          .of(context)
+                                                                      .bodyMedium
+                                                                      .override(
+                                                                        fontFamily:
+                                                                            'Inter',
+                                                                        fontSize:
+                                                                            23.0,
+                                                                        letterSpacing:
+                                                                            0.0,
+                                                                        fontWeight:
+                                                                            FontWeight
+                                                                                .w600,
+                                                                      ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                        Row(
+                                                          mainAxisSize:
+                                                              MainAxisSize.max,
+                                                          children: [
+                                                            Container(
+                                                              width:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .width *
+                                                                      0.05,
+                                                              height:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .height *
+                                                                      0.04,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: const Color(
+                                                                    0x3308018C),
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                      0x80000000),
+                                                                ),
+                                                              ),
+                                                              child: Align(
+                                                                alignment:
+                                                                    const AlignmentDirectional(
+                                                                        0.0, 0.0),
+                                                                child: Text(
+                                                                  '3',
+                                                                  style: FlutterFlowTheme
+                                                                          .of(context)
+                                                                      .bodyMedium
+                                                                      .override(
+                                                                        fontFamily:
+                                                                            'Inter',
+                                                                        fontSize:
+                                                                            25.0,
+                                                                        letterSpacing:
+                                                                            0.0,
+                                                                        fontWeight:
+                                                                            FontWeight
+                                                                                .w600,
+                                                                      ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                            Container(
+                                                              width:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .width *
+                                                                      0.07,
+                                                              height:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .height *
+                                                                      0.04,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: FlutterFlowTheme
+                                                                        .of(context)
+                                                                    .secondaryBackground,
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                      0x80000000),
+                                                                ),
+                                                              ),
+                                                              child: Align(
+                                                                alignment:
+                                                                    const AlignmentDirectional(
+                                                                        0.0, 0.0),
+                                                                child: Text(
+                                                                  getValue(
+                                                                      Constants
+                                                                          .names[3],
+                                                                      "3",
+                                                                      0),
+                                                                  style: FlutterFlowTheme
+                                                                          .of(context)
+                                                                      .bodyMedium
+                                                                      .override(
+                                                                        fontFamily:
+                                                                            'Inter',
+                                                                        fontSize:
+                                                                            23.0,
+                                                                        letterSpacing:
+                                                                            0.0,
+                                                                        fontWeight:
+                                                                            FontWeight
+                                                                                .w600,
+                                                                      ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                            Container(
+                                                              width:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .width *
+                                                                      0.07,
+                                                              height:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .height *
+                                                                      0.04,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: FlutterFlowTheme
+                                                                        .of(context)
+                                                                    .secondaryBackground,
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                      0x80000000),
+                                                                ),
+                                                              ),
+                                                              child: Align(
+                                                                alignment:
+                                                                    const AlignmentDirectional(
+                                                                        0.0, 0.0),
+                                                                child: Text(
+                                                                  getValue(
+                                                                      Constants
+                                                                          .names[3],
+                                                                      "3",
+                                                                      1),
+                                                                  style: FlutterFlowTheme
+                                                                          .of(context)
+                                                                      .bodyMedium
+                                                                      .override(
+                                                                        fontFamily:
+                                                                            'Inter',
+                                                                        fontSize:
+                                                                            23.0,
+                                                                        letterSpacing:
+                                                                            0.0,
+                                                                        fontWeight:
+                                                                            FontWeight
+                                                                                .w600,
+                                                                      ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                            Container(
+                                                              width:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .width *
+                                                                      0.07,
+                                                              height:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .height *
+                                                                      0.04,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: FlutterFlowTheme
+                                                                        .of(context)
+                                                                    .secondaryBackground,
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                      0x80000000),
+                                                                ),
+                                                              ),
+                                                              child: Align(
+                                                                alignment:
+                                                                    const AlignmentDirectional(
+                                                                        0.0, 0.0),
+                                                                child: Text(
+                                                                  getValue(
+                                                                      Constants
+                                                                          .names[3],
+                                                                      "3",
+                                                                      2),
+                                                                  style: FlutterFlowTheme
+                                                                          .of(context)
+                                                                      .bodyMedium
+                                                                      .override(
+                                                                        fontFamily:
+                                                                            'Inter',
+                                                                        fontSize:
+                                                                            23.0,
+                                                                        letterSpacing:
+                                                                            0.0,
+                                                                        fontWeight:
+                                                                            FontWeight
+                                                                                .w600,
+                                                                      ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                            Container(
+                                                              width:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .width *
+                                                                      0.07,
+                                                              height:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .height *
+                                                                      0.04,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: const Color(
+                                                                    0x66B6B6B6),
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                      0x80000000),
+                                                                  width: 1.0,
+                                                                ),
+                                                              ),
+                                                              child: Align(
+                                                                alignment:
+                                                                    const AlignmentDirectional(
+                                                                        0.0, 0.0),
+                                                                child: Text(
+                                                                  getAverage(
+                                                                      Constants
+                                                                          .names[3],
+                                                                      "3"),
+                                                                  style: FlutterFlowTheme
+                                                                          .of(context)
+                                                                      .bodyMedium
+                                                                      .override(
+                                                                        fontFamily:
+                                                                            'Inter',
+                                                                        fontSize:
+                                                                            23.0,
+                                                                        letterSpacing:
+                                                                            0.0,
+                                                                        fontWeight:
+                                                                            FontWeight
+                                                                                .w600,
+                                                                      ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                        Row(
+                                                          mainAxisSize:
+                                                              MainAxisSize.max,
+                                                          children: [
+                                                            Container(
+                                                              width:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .width *
+                                                                      0.05,
+                                                              height:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .height *
+                                                                      0.04,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: const Color(
+                                                                    0x3308018C),
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                      0x80000000),
+                                                                ),
+                                                              ),
+                                                              child: Align(
+                                                                alignment:
+                                                                    const AlignmentDirectional(
+                                                                        0.0, 0.0),
+                                                                child: Text(
+                                                                  '4',
+                                                                  style: FlutterFlowTheme
+                                                                          .of(context)
+                                                                      .bodyMedium
+                                                                      .override(
+                                                                        fontFamily:
+                                                                            'Inter',
+                                                                        fontSize:
+                                                                            25.0,
+                                                                        letterSpacing:
+                                                                            0.0,
+                                                                        fontWeight:
+                                                                            FontWeight
+                                                                                .w600,
+                                                                      ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                            IndexedText(),
+                                                            IndexedText(),
+                                                            IndexedText(),
+                                                            Container(
+                                                              width:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .width *
+                                                                      0.07,
+                                                              height:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .height *
+                                                                      0.04,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: const Color(
+                                                                    0x66B6B6B6),
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                      0x80000000),
+                                                                  width: 1.0,
+                                                                ),
+                                                              ),
+                                                              child: Align(
+                                                                alignment:
+                                                                    const AlignmentDirectional(
+                                                                        0.0, 0.0),
+                                                                child: Text(
+                                                                  '평균4',
+                                                                  style: FlutterFlowTheme
+                                                                          .of(context)
+                                                                      .bodyMedium
+                                                                      .override(
+                                                                        fontFamily:
+                                                                            'Inter',
+                                                                        fontSize:
+                                                                            23.0,
+                                                                        letterSpacing:
+                                                                            0.0,
+                                                                        fontWeight:
+                                                                            FontWeight
+                                                                                .w600,
+                                                                      ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                        Row(
+                                                          mainAxisSize:
+                                                              MainAxisSize.max,
+                                                          children: [
+                                                            Container(
+                                                              width:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .width *
+                                                                      0.05,
+                                                              height:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .height *
+                                                                      0.04,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: const Color(
+                                                                    0x3308018C),
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                      0x80000000),
+                                                                ),
+                                                              ),
+                                                              child: Align(
+                                                                alignment:
+                                                                    const AlignmentDirectional(
+                                                                        0.0, 0.0),
+                                                                child: Text(
+                                                                  '5',
+                                                                  style: FlutterFlowTheme
+                                                                          .of(context)
+                                                                      .bodyMedium
+                                                                      .override(
+                                                                        fontFamily:
+                                                                            'Inter',
+                                                                        fontSize:
+                                                                            25.0,
+                                                                        letterSpacing:
+                                                                            0.0,
+                                                                        fontWeight:
+                                                                            FontWeight
+                                                                                .w600,
+                                                                      ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                            IndexedText(),
+                                                            IndexedText(),
+                                                            IndexedText(),
+                                                            Container(
+                                                              width:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .width *
+                                                                      0.07,
+                                                              height:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .height *
+                                                                      0.04,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: const Color(
+                                                                    0x66B6B6B6),
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                      0x80000000),
+                                                                  width: 1.0,
+                                                                ),
+                                                              ),
+                                                              child: Align(
+                                                                alignment:
+                                                                    const AlignmentDirectional(
+                                                                        0.0, 0.0),
+                                                                child: Text(
+                                                                  '평균5',
+                                                                  style: FlutterFlowTheme
+                                                                          .of(context)
+                                                                      .bodyMedium
+                                                                      .override(
+                                                                        fontFamily:
+                                                                            'Inter',
+                                                                        fontSize:
+                                                                            23.0,
+                                                                        letterSpacing:
+                                                                            0.0,
+                                                                        fontWeight:
+                                                                            FontWeight
+                                                                                .w600,
+                                                                      ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                        Row(
+                                                          mainAxisSize:
+                                                              MainAxisSize.max,
+                                                          children: [
+                                                            Container(
+                                                              width:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .width *
+                                                                      0.05,
+                                                              height:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .height *
+                                                                      0.04,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: const Color(
+                                                                    0x3308018C),
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                      0x80000000),
+                                                                ),
+                                                              ),
+                                                              child: Align(
+                                                                alignment:
+                                                                    const AlignmentDirectional(
+                                                                        0.0, 0.0),
+                                                                child: Text(
+                                                                  '6',
+                                                                  style: FlutterFlowTheme
+                                                                          .of(context)
+                                                                      .bodyMedium
+                                                                      .override(
+                                                                        fontFamily:
+                                                                            'Inter',
+                                                                        fontSize:
+                                                                            25.0,
+                                                                        letterSpacing:
+                                                                            0.0,
+                                                                        fontWeight:
+                                                                            FontWeight
+                                                                                .w600,
+                                                                      ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                            IndexedText(),
+                                                            IndexedText(),
+                                                            IndexedText(),
+                                                            Container(
+                                                              width:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .width *
+                                                                      0.07,
+                                                              height:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .height *
+                                                                      0.04,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: const Color(
+                                                                    0x66B6B6B6),
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                      0x80000000),
+                                                                  width: 1.0,
+                                                                ),
+                                                              ),
+                                                              child: Align(
+                                                                alignment:
+                                                                    const AlignmentDirectional(
+                                                                        0.0, 0.0),
+                                                                child: Text(
+                                                                  '평균6',
+                                                                  style: FlutterFlowTheme
+                                                                          .of(context)
+                                                                      .bodyMedium
+                                                                      .override(
+                                                                        fontFamily:
+                                                                            'Inter',
+                                                                        fontSize:
+                                                                            23.0,
+                                                                        letterSpacing:
+                                                                            0.0,
+                                                                        fontWeight:
+                                                                            FontWeight
+                                                                                .w600,
+                                                                      ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                        Row(
+                                                          mainAxisSize:
+                                                              MainAxisSize.max,
+                                                          children: [
+                                                            Container(
+                                                              width:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .width *
+                                                                      0.05,
+                                                              height:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .height *
+                                                                      0.045,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: const Color(
+                                                                    0xFF08018C),
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                      0x80000000),
+                                                                ),
+                                                              ),
+                                                              child: Align(
+                                                                alignment:
+                                                                    const AlignmentDirectional(
+                                                                        0.0, 0.0),
+                                                                child: Text(
+                                                                  '불량',
+                                                                  style: FlutterFlowTheme
+                                                                          .of(context)
+                                                                      .bodyMedium
+                                                                      .override(
+                                                                        fontFamily:
+                                                                            'Inter',
+                                                                        color: Colors
+                                                                            .white,
+                                                                        fontSize:
+                                                                            23.0,
+                                                                        letterSpacing:
+                                                                            0.0,
+                                                                        fontWeight:
+                                                                            FontWeight
+                                                                                .w600,
+                                                                      ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                            Container(
+                                                              width:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .width *
+                                                                      0.1,
+                                                              height:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .height *
+                                                                      0.045,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: FlutterFlowTheme
+                                                                        .of(context)
+                                                                    .secondaryBackground,
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                      0x80000000),
+                                                                ),
+                                                              ),
+                                                              child: Align(
+                                                                alignment:
+                                                                    const AlignmentDirectional(
+                                                                        -1.0, 0.0),
+                                                                child: Padding(
+                                                                  padding:
+                                                                      const EdgeInsetsDirectional
+                                                                          .fromSTEB(
+                                                                              8.0,
+                                                                              0.0,
+                                                                              0.0,
+                                                                              0.0),
+                                                                  child: Text(
+                                                                    '수량:',
+                                                                    textAlign:
+                                                                        TextAlign
+                                                                            .center,
+                                                                    style: FlutterFlowTheme.of(
+                                                                            context)
+                                                                        .bodyMedium
+                                                                        .override(
+                                                                          fontFamily:
+                                                                              'Inter',
+                                                                          fontSize:
+                                                                              23.0,
+                                                                          letterSpacing:
+                                                                              0.0,
+                                                                          fontWeight:
+                                                                              FontWeight
+                                                                                  .w600,
+                                                                        ),
+                                                                  ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                            Container(
+                                                              width:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .width *
+                                                                      0.18,
+                                                              height:
+                                                                  MediaQuery.sizeOf(
+                                                                              context)
+                                                                          .height *
+                                                                      0.045,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: FlutterFlowTheme
+                                                                        .of(context)
+                                                                    .secondaryBackground,
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                      0x80000000),
+                                                                ),
+                                                              ),
+                                                              child: Align(
+                                                                alignment:
+                                                                    const AlignmentDirectional(
+                                                                        -1.0, 0.0),
+                                                                child: Padding(
+                                                                  padding:
+                                                                      const EdgeInsetsDirectional
+                                                                          .fromSTEB(
+                                                                              8.0,
+                                                                              0.0,
+                                                                              0.0,
+                                                                              0.0),
+                                                                  child: Text(
+                                                                    '양품 수량:',
+                                                                    style: FlutterFlowTheme.of(
+                                                                            context)
+                                                                        .bodyMedium
+                                                                        .override(
+                                                                          fontFamily:
+                                                                              'Inter',
+                                                                          fontSize:
+                                                                              23.0,
+                                                                          letterSpacing:
+                                                                              0.0,
+                                                                          fontWeight:
+                                                                              FontWeight
+                                                                                  .w600,
+                                                                    ),
+                                                                ),
+                                                              ),
+                                                             ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ],
+                                                   ),
                                                 ),
-                                              ),
+                                               ),
+
+                                                const DownloadButton()
+                                              ].addToStart(
+                                                  const SizedBox(width: 40.0)),  
                                             ),
                                           ],
                                         ),
@@ -10707,6 +10752,9 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                 ),
                               ],
                             ),
+                            //-----표4번끝------------------------------------------------
+
+                            
                             Column(
                               mainAxisSize: MainAxisSize.max,
                               mainAxisAlignment: MainAxisAlignment.start,
@@ -11617,7 +11665,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                     width: MediaQuery.sizeOf(
                                                                 context)
                                                             .width *
-                                                        0.365,
+                                                        0.368,
                                                     height: MediaQuery.sizeOf(
                                                                 context)
                                                             .height *
@@ -11718,7 +11766,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                       width: MediaQuery.sizeOf(
                                                                   context)
                                                               .width *
-                                                          0.365,
+                                                          0.368,
                                                       height: MediaQuery.sizeOf(
                                                                   context)
                                                               .height *
@@ -11740,7 +11788,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     4.0,
                                                                     0.0),
                                                         child: Text(
-                                                          '1. 이상발생시 즉시 품질에 통보\n2. 자주검사 기준서 필히 숙지할것\n(양호 :O  불량발생:X  치수:치수기입)',
+                                                          '1. 이상 발생시 즉시 품질에 통보\n2. 자주검사 기준서 필히 숙지할것\n(양호 :O  불량발생:X  치수:치수기입)',
                                                           textAlign:
                                                               TextAlign.center,
                                                           style: FlutterFlowTheme
@@ -11749,7 +11797,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                               .override(
                                                                 fontFamily:
                                                                     'Inter',
-                                                                fontSize: 23.0,
+                                                                fontSize: 20.0,
                                                                 letterSpacing:
                                                                     0.0,
                                                                 fontWeight:
@@ -12203,1508 +12251,1524 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                     ),
                                                   ),
                                                 ),
-                                                Padding(
-                                                  padding: const EdgeInsetsDirectional
-                                                      .fromSTEB(
-                                                          4.0, 4.0, 4.0, 4.0),
-                                                  child: Container(
-                                                    width: MediaQuery.sizeOf(
-                                                                context)
-                                                            .width *
-                                                        0.33,
-                                                    height: MediaQuery.sizeOf(
-                                                                context)
-                                                            .height *
-                                                        0.365,
-                                                    decoration: BoxDecoration(
-                                                      color: FlutterFlowTheme
-                                                              .of(context)
-                                                          .secondaryBackground,
-                                                      border: Border.all(
-                                                        color: Colors.white,
-                                                        width: 0.0,
-                                                      ),
-                                                    ),
-                                                    child: Column(
-                                                      mainAxisSize:
-                                                          MainAxisSize.max,
-                                                      children: [
-                                                        Row(
-                                                          mainAxisSize:
-                                                              MainAxisSize.max,
-                                                          children: [
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.05,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0xFF08018C),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  'NO.',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        color: Colors
-                                                                            .white,
-                                                                        fontSize:
-                                                                            25.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0xFF08018C),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '초',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        color: Colors
-                                                                            .white,
-                                                                        fontSize:
-                                                                            25.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0xFF08018C),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '중',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        color: Colors
-                                                                            .white,
-                                                                        fontSize:
-                                                                            25.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0xFF08018C),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '종',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        color: Colors
-                                                                            .white,
-                                                                        fontSize:
-                                                                            25.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0xFF08018C),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                  width: 1.0,
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '평균',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        color: Colors
-                                                                            .white,
-                                                                        fontSize:
-                                                                            25.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                          ],
+
+                                                //-----표5번시작--------------------------------------------
+                                                Row(
+                                                  mainAxisSize: MainAxisSize.max,
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment.center,
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.end,
+                                                  children: [  
+                                                    Padding(
+                                                      padding: const EdgeInsetsDirectional
+                                                          .fromSTEB(
+                                                              4.0, 4.0, 4.0, 4.0),
+                                                      child: Container(
+                                                        width: MediaQuery.sizeOf(
+                                                                    context)
+                                                                .width *
+                                                            0.33,
+                                                        height: MediaQuery.sizeOf(
+                                                                    context)
+                                                                .height *
+                                                            0.368,
+                                                        decoration: BoxDecoration(
+                                                          color: FlutterFlowTheme
+                                                                  .of(context)
+                                                              .secondaryBackground,
+                                                          border: Border.all(
+                                                            color: Colors.white,
+                                                            width: 0.0,
+                                                          ),
                                                         ),
-                                                        Row(
+                                                        child: Column(
                                                           mainAxisSize:
                                                               MainAxisSize.max,
                                                           children: [
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.05,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x3308018C),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '1',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            25.0,
-                                                                        letterSpacing:
+                                                            Row(
+                                                              mainAxisSize:
+                                                                  MainAxisSize.max,
+                                                              children: [
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.05,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: const Color(
+                                                                        0xFF08018C),
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
                                                                             0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            IndexedText(),
-                                                            IndexedText(),
-                                                            IndexedText(),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      'NO.',
+                                                                      style: FlutterFlowTheme.of(
                                                                               context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x32B6B6B6),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                  width: 1.0,
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            color: Colors
+                                                                                .white,
+                                                                            fontSize:
+                                                                                25.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
                                                                 ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '평균1',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.07,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: const Color(
+                                                                        0xFF08018C),
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
                                                                             0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                          ],
-                                                        ),
-                                                        Row(
-                                                          mainAxisSize:
-                                                              MainAxisSize.max,
-                                                          children: [
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      '초',
+                                                                      style: FlutterFlowTheme.of(
                                                                               context)
-                                                                      .width *
-                                                                  0.05,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x3308018C),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            color: Colors
+                                                                                .white,
+                                                                            fontSize:
+                                                                                25.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
                                                                 ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '2',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            25.0,
-                                                                        letterSpacing:
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.07,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: const Color(
+                                                                        0xFF08018C),
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
                                                                             0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      '중',
+                                                                      style: FlutterFlowTheme.of(
                                                                               context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            color: Colors
+                                                                                .white,
+                                                                            fontSize:
+                                                                                25.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
                                                                 ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  getValue(
-                                                                      Constants
-                                                                          .names[4],
-                                                                      "2",
-                                                                      0),
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.07,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: const Color(
+                                                                        0xFF08018C),
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
                                                                             0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      '종',
+                                                                      style: FlutterFlowTheme.of(
                                                                               context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            color: Colors
+                                                                                .white,
+                                                                            fontSize:
+                                                                                25.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
                                                                 ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  getValue(
-                                                                      Constants
-                                                                          .names[4],
-                                                                      "2",
-                                                                      1),
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.07,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: const Color(
+                                                                        0xFF08018C),
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                      width: 1.0,
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
                                                                             0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      '평균',
+                                                                      style: FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            color: Colors
+                                                                                .white,
+                                                                            fontSize:
+                                                                                25.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
                                                                 ),
-                                                              ),
+                                                              ],
                                                             ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  getValue(
-                                                                      Constants
-                                                                          .names[4],
-                                                                      "2",
-                                                                      2),
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
+                                                            Row(
+                                                              mainAxisSize:
+                                                                  MainAxisSize.max,
+                                                              children: [
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.05,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: const Color(
+                                                                        0x3308018C),
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
                                                                             0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      '1',
+                                                                      style: FlutterFlowTheme.of(
                                                                               context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x32B6B6B6),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                  width: 1.0,
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                25.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
                                                                 ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  getAverage(
-                                                                      Constants
-                                                                          .names[4],
-                                                                      "2"),
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
+                                                                IndexedText(),
+                                                                IndexedText(),
+                                                                IndexedText(),
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.07,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: const Color(
+                                                                        0x32B6B6B6),
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                      width: 1.0,
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
                                                                             0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      '평균1',
+                                                                      style: FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                23.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
                                                                 ),
-                                                              ),
+                                                              ],
                                                             ),
-                                                          ],
-                                                        ),
-                                                        Row(
-                                                          mainAxisSize:
-                                                              MainAxisSize.max,
-                                                          children: [
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.05,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x3308018C),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '3',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            25.0,
-                                                                        letterSpacing:
+                                                            Row(
+                                                              mainAxisSize:
+                                                                  MainAxisSize.max,
+                                                              children: [
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.05,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: const Color(
+                                                                        0x3308018C),
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
                                                                             0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      '2',
+                                                                      style: FlutterFlowTheme.of(
                                                                               context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                25.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
                                                                 ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  getValue(
-                                                                      Constants
-                                                                          .names[4],
-                                                                      "3",
-                                                                      0),
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.07,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: FlutterFlowTheme.of(
+                                                                            context)
+                                                                        .secondaryBackground,
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
                                                                             0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      getValue(
+                                                                          Constants
+                                                                              .names[4],
+                                                                          "2",
+                                                                          0),
+                                                                      style: FlutterFlowTheme.of(
                                                                               context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                23.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
                                                                 ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  getValue(
-                                                                      Constants
-                                                                          .names[4],
-                                                                      "3",
-                                                                      1),
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.07,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: FlutterFlowTheme.of(
+                                                                            context)
+                                                                        .secondaryBackground,
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
                                                                             0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      getValue(
+                                                                          Constants
+                                                                              .names[4],
+                                                                          "2",
+                                                                          1),
+                                                                      style: FlutterFlowTheme.of(
                                                                               context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                23.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
                                                                 ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  getValue(
-                                                                      Constants
-                                                                          .names[4],
-                                                                      "3",
-                                                                      2),
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.07,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: FlutterFlowTheme.of(
+                                                                            context)
+                                                                        .secondaryBackground,
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
                                                                             0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      getValue(
+                                                                          Constants
+                                                                              .names[4],
+                                                                          "2",
+                                                                          2),
+                                                                      style: FlutterFlowTheme.of(
                                                                               context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x32B6B6B6),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                  width: 1.0,
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                23.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
                                                                 ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  getAverage(
-                                                                      Constants
-                                                                          .names[4],
-                                                                      "3"),
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.07,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: const Color(
+                                                                        0x32B6B6B6),
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                      width: 1.0,
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
                                                                             0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      getAverage(
+                                                                          Constants
+                                                                              .names[4],
+                                                                          "2"),
+                                                                      style: FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                23.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
                                                                 ),
-                                                              ),
+                                                              ],
                                                             ),
-                                                          ],
-                                                        ),
-                                                        Row(
-                                                          mainAxisSize:
-                                                              MainAxisSize.max,
-                                                          children: [
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.05,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x3308018C),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '4',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            25.0,
-                                                                        letterSpacing:
+                                                            Row(
+                                                              mainAxisSize:
+                                                                  MainAxisSize.max,
+                                                              children: [
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.05,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: const Color(
+                                                                        0x3308018C),
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
                                                                             0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      '3',
+                                                                      style: FlutterFlowTheme.of(
                                                                               context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                25.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
                                                                 ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  getValue(
-                                                                      Constants
-                                                                          .names[4],
-                                                                      "4",
-                                                                      0),
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.07,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: FlutterFlowTheme.of(
+                                                                            context)
+                                                                        .secondaryBackground,
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
                                                                             0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      getValue(
+                                                                          Constants
+                                                                              .names[4],
+                                                                          "3",
+                                                                          0),
+                                                                      style: FlutterFlowTheme.of(
                                                                               context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                23.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
                                                                 ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  getValue(
-                                                                      Constants
-                                                                          .names[4],
-                                                                      "4",
-                                                                      1),
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.07,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: FlutterFlowTheme.of(
+                                                                            context)
+                                                                        .secondaryBackground,
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
                                                                             0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      getValue(
+                                                                          Constants
+                                                                              .names[4],
+                                                                          "3",
+                                                                          1),
+                                                                      style: FlutterFlowTheme.of(
                                                                               context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                23.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
                                                                 ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  getValue(
-                                                                      Constants
-                                                                          .names[4],
-                                                                      "4",
-                                                                      2),
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.07,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: FlutterFlowTheme.of(
+                                                                            context)
+                                                                        .secondaryBackground,
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
                                                                             0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      getValue(
+                                                                          Constants
+                                                                              .names[4],
+                                                                          "3",
+                                                                          2),
+                                                                      style: FlutterFlowTheme.of(
                                                                               context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x32B6B6B6),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                  width: 1.0,
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                23.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
                                                                 ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  getAverage(
-                                                                      Constants
-                                                                          .names[4],
-                                                                      "4"),
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.07,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: const Color(
+                                                                        0x32B6B6B6),
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                      width: 1.0,
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
                                                                             0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      getAverage(
+                                                                          Constants
+                                                                              .names[4],
+                                                                          "3"),
+                                                                      style: FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                23.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
                                                                 ),
-                                                              ),
+                                                              ],
                                                             ),
-                                                          ],
-                                                        ),
-                                                        Row(
-                                                          mainAxisSize:
-                                                              MainAxisSize.max,
-                                                          children: [
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.05,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x3308018C),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '5',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            25.0,
-                                                                        letterSpacing:
+                                                            Row(
+                                                              mainAxisSize:
+                                                                  MainAxisSize.max,
+                                                              children: [
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.05,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: const Color(
+                                                                        0x3308018C),
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
                                                                             0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            IndexedText(),
-                                                            IndexedText(),
-                                                            IndexedText(),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      '4',
+                                                                      style: FlutterFlowTheme.of(
                                                                               context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x32B6B6B6),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                  width: 1.0,
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                25.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
                                                                 ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '평균5',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.07,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: FlutterFlowTheme.of(
+                                                                            context)
+                                                                        .secondaryBackground,
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
                                                                             0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                          ],
-                                                        ),
-                                                        Row(
-                                                          mainAxisSize:
-                                                              MainAxisSize.max,
-                                                          children: [
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      getValue(
+                                                                          Constants
+                                                                              .names[4],
+                                                                          "4",
+                                                                          0),
+                                                                      style: FlutterFlowTheme.of(
                                                                               context)
-                                                                      .width *
-                                                                  0.05,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x3308018C),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                23.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
                                                                 ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '6',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            25.0,
-                                                                        letterSpacing:
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.07,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: FlutterFlowTheme.of(
+                                                                            context)
+                                                                        .secondaryBackground,
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
                                                                             0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            IndexedText(),
-                                                            IndexedText(),
-                                                            IndexedText(),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      getValue(
+                                                                          Constants
+                                                                              .names[4],
+                                                                          "4",
+                                                                          1),
+                                                                      style: FlutterFlowTheme.of(
                                                                               context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x32B6B6B6),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                  width: 1.0,
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                23.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
                                                                 ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '평균6',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.07,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: FlutterFlowTheme.of(
+                                                                            context)
+                                                                        .secondaryBackground,
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
                                                                             0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                          ],
-                                                        ),
-                                                        Row(
-                                                          mainAxisSize:
-                                                              MainAxisSize.max,
-                                                          children: [
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      getValue(
+                                                                          Constants
+                                                                              .names[4],
+                                                                          "4",
+                                                                          2),
+                                                                      style: FlutterFlowTheme.of(
                                                                               context)
-                                                                      .width *
-                                                                  0.05,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x3308018C),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                23.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
                                                                 ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '7',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            25.0,
-                                                                        letterSpacing:
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.07,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: const Color(
+                                                                        0x32B6B6B6),
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                      width: 1.0,
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
                                                                             0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      getAverage(
+                                                                          Constants
+                                                                              .names[4],
+                                                                          "4"),
+                                                                      style: FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                23.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
                                                                 ),
-                                                              ),
+                                                              ],
                                                             ),
-                                                            IndexedText(),
-                                                            IndexedText(),
-                                                            IndexedText(),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x32B6B6B6),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                  width: 1.0,
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '평균7',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
+                                                            Row(
+                                                              mainAxisSize:
+                                                                  MainAxisSize.max,
+                                                              children: [
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.05,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: const Color(
+                                                                        0x3308018C),
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
                                                                             0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                          ],
-                                                        ),
-                                                        Row(
-                                                          mainAxisSize:
-                                                              MainAxisSize.max,
-                                                          children: [
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      '5',
+                                                                      style: FlutterFlowTheme.of(
                                                                               context)
-                                                                      .width *
-                                                                  0.05,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x3308018C),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                25.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
                                                                 ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '8',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            25.0,
-                                                                        letterSpacing:
+                                                                IndexedText(),
+                                                                IndexedText(),
+                                                                IndexedText(),
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.07,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: const Color(
+                                                                        0x32B6B6B6),
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                      width: 1.0,
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
                                                                             0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      '평균5',
+                                                                      style: FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                23.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
                                                                 ),
-                                                              ),
+                                                              ],
                                                             ),
-                                                            IndexedText(),
-                                                            IndexedText(),
-                                                            IndexedText(),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x32B6B6B6),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                  width: 1.0,
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '평균8',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
+                                                            Row(
+                                                              mainAxisSize:
+                                                                  MainAxisSize.max,
+                                                              children: [
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.05,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: const Color(
+                                                                        0x3308018C),
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
                                                                             0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      '6',
+                                                                      style: FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                25.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                                IndexedText(),
+                                                                IndexedText(),
+                                                                IndexedText(),
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.07,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: const Color(
+                                                                        0x32B6B6B6),
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                      width: 1.0,
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
+                                                                            0.0,
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      '평균6',
+                                                                      style: FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                23.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                              ],
+                                                            ),
+                                                            Row(
+                                                              mainAxisSize:
+                                                                  MainAxisSize.max,
+                                                              children: [
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.05,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: const Color(
+                                                                        0x3308018C),
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
+                                                                            0.0,
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      '7',
+                                                                      style: FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                25.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                                IndexedText(),
+                                                                IndexedText(),
+                                                                IndexedText(),
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.07,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: const Color(
+                                                                        0x32B6B6B6),
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                      width: 1.0,
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
+                                                                            0.0,
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      '평균7',
+                                                                      style: FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                23.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                              ],
+                                                            ),
+                                                            Row(
+                                                              mainAxisSize:
+                                                                  MainAxisSize.max,
+                                                              children: [
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.05,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: const Color(
+                                                                        0x3308018C),
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
+                                                                            0.0,
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      '8',
+                                                                      style: FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                25.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                                IndexedText(),
+                                                                IndexedText(),
+                                                                IndexedText(),
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.07,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: const Color(
+                                                                        0x32B6B6B6),
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                      width: 1.0,
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
+                                                                            0.0,
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      '평균8',
+                                                                      style: FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                23.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                        ),
+                                                                  ),
                                                                 ),
                                                               ),
-                                                            ),
+                                                          
                                                           ],
                                                         ),
                                                       ],
                                                     ),
                                                   ),
                                                 ),
-                                              ],
+                                                const DownloadButton()
+                                              ].addToStart(
+                                                  const SizedBox(width: 40.0)),
                                             ),
-                                          ),
-                                        ],
+                                          ],
+                                        ),
                                       ),
+                                    ],
+                                  ),
                                     ),
                                   ),
                                 ),
-                              ],
-                            ),
+                              ],                        
+                            ),   
+                            //-----표5번끝--------------------------------------------
+
                             Column(
                               mainAxisSize: MainAxisSize.max,
                               mainAxisAlignment: MainAxisAlignment.start,
@@ -14615,7 +14679,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                     width: MediaQuery.sizeOf(
                                                                 context)
                                                             .width *
-                                                        0.365,
+                                                        0.368,
                                                     height: MediaQuery.sizeOf(
                                                                 context)
                                                             .height *
@@ -14657,7 +14721,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                   child: Padding(
                                                     padding:
                                                         const EdgeInsetsDirectional
-                                                            .fromSTEB(0.0, 8.0,
+                                                            .fromSTEB(0.0, 4.0,
                                                                 0.0, 0.0),
                                                     child: Container(
                                                       width: MediaQuery.sizeOf(
@@ -14708,17 +14772,17 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                   child: Padding(
                                                     padding:
                                                         const EdgeInsetsDirectional
-                                                            .fromSTEB(0.0, 8.0,
+                                                            .fromSTEB(0.0, 4.0,
                                                                 0.0, 0.0),
                                                     child: Container(
                                                       width: MediaQuery.sizeOf(
                                                                   context)
                                                               .width *
-                                                          0.365,
+                                                          0.368,
                                                       height: MediaQuery.sizeOf(
                                                                   context)
                                                               .height *
-                                                          0.098,
+                                                          0.095,
                                                       decoration: BoxDecoration(
                                                         color: FlutterFlowTheme
                                                                 .of(context)
@@ -14736,7 +14800,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                                     4.0,
                                                                     0.0),
                                                         child: Text(
-                                                          '1. 이상발생시 즉시 품질에 통보\n2. 자주검사 기준서 필히 숙지할것\n(양호 :O  불량발생:X  치수:치수기입)',
+                                                          '1. 이상 발생시 즉시 품질에 통보\n2. 자주검사 기준서 필히 숙지할것\n(양호 :O  불량발생:X  치수:치수기입)',
                                                           textAlign:
                                                               TextAlign.center,
                                                           style: FlutterFlowTheme
@@ -14745,7 +14809,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                               .override(
                                                                 fontFamily:
                                                                     'Inter',
-                                                                fontSize: 23.0,
+                                                                fontSize: 20.0,
                                                                 letterSpacing:
                                                                     0.0,
                                                                 fontWeight:
@@ -15199,1586 +15263,1594 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                     ),
                                                   ),
                                                 ),
-                                                Padding(
-                                                  padding: const EdgeInsetsDirectional
-                                                      .fromSTEB(
-                                                          4.0, 4.0, 4.0, 4.0),
-                                                  child: Container(
-                                                    width: MediaQuery.sizeOf(
-                                                                context)
-                                                            .width *
-                                                        0.33,
-                                                    height: MediaQuery.sizeOf(
-                                                                context)
-                                                            .height *
-                                                        0.4,
-                                                    decoration: BoxDecoration(
-                                                      color: FlutterFlowTheme
-                                                              .of(context)
-                                                          .secondaryBackground,
-                                                      border: Border.all(
-                                                        color: Colors.white,
-                                                        width: 0.0,
-                                                      ),
-                                                    ),
-                                                    child: Column(
-                                                      mainAxisSize:
-                                                          MainAxisSize.max,
-                                                      children: [
-                                                        Row(
-                                                          mainAxisSize:
-                                                              MainAxisSize.max,
-                                                          children: [
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.05,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0xFF08018C),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  'NO.',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        color: Colors
-                                                                            .white,
-                                                                        fontSize:
-                                                                            25.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0xFF08018C),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '초',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        color: Colors
-                                                                            .white,
-                                                                        fontSize:
-                                                                            25.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0xFF08018C),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '중',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        color: Colors
-                                                                            .white,
-                                                                        fontSize:
-                                                                            25.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0xFF08018C),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '종',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        color: Colors
-                                                                            .white,
-                                                                        fontSize:
-                                                                            25.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0xFF08018C),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                  width: 1.0,
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '평균',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        color: Colors
-                                                                            .white,
-                                                                        fontSize:
-                                                                            25.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                          ],
+                                                //-----표6번시작---------------------------------------------------------
+                                                Row(
+                                                  mainAxisSize: MainAxisSize.max,
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment.center,
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.end,
+                                                  children: [
+                                                    Padding(
+                                                      padding: const EdgeInsetsDirectional
+                                                          .fromSTEB(
+                                                              4.0, 4.0, 4.0, 4.0),
+                                                      child: Container(
+                                                        width: MediaQuery.sizeOf(
+                                                                    context)
+                                                                .width *
+                                                            0.33,
+                                                        height: MediaQuery.sizeOf(
+                                                                    context)
+                                                                .height *
+                                                            0.4,
+                                                        decoration: BoxDecoration(
+                                                          color: FlutterFlowTheme
+                                                                  .of(context)
+                                                              .secondaryBackground,
+                                                          border: Border.all(
+                                                            color: Colors.white,
+                                                            width: 0.0,
+                                                          ),
                                                         ),
-                                                        Row(
+                                                        child: Column(
                                                           mainAxisSize:
                                                               MainAxisSize.max,
                                                           children: [
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.05,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x3308018C),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '1',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            25.0,
-                                                                        letterSpacing:
+                                                            Row(
+                                                              mainAxisSize:
+                                                                  MainAxisSize.max,
+                                                              children: [
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.05,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: const Color(
+                                                                        0xFF08018C),
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
                                                                             0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      'NO.',
+                                                                      style: FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            color: Colors
+                                                                                .white,
+                                                                            fontSize:
+                                                                                25.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
                                                                 ),
-                                                              ),
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.07,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: const Color(
+                                                                        0xFF08018C),
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
+                                                                            0.0,
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      '초',
+                                                                      style: FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            color: Colors
+                                                                                .white,
+                                                                            fontSize:
+                                                                                25.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.07,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: const Color(
+                                                                        0xFF08018C),
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
+                                                                            0.0,
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      '중',
+                                                                      style: FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            color: Colors
+                                                                                .white,
+                                                                            fontSize:
+                                                                                25.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.07,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: const Color(
+                                                                        0xFF08018C),
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
+                                                                            0.0,
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      '종',
+                                                                      style: FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            color: Colors
+                                                                                .white,
+                                                                            fontSize:
+                                                                                25.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.07,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: const Color(
+                                                                        0xFF08018C),
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                      width: 1.0,
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
+                                                                            0.0,
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      '평균',
+                                                                      style: FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            color: Colors
+                                                                                .white,
+                                                                            fontSize:
+                                                                                25.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                              ],
                                                             ),
-                                                            IndexedText(),
-                                                            IndexedText(),
-                                                            IndexedText(),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x32B6B6B6),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                  width: 1.0,
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '평균1',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
+                                                            Row(
+                                                              mainAxisSize:
+                                                                  MainAxisSize.max,
+                                                              children: [
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.05,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: const Color(
+                                                                        0x3308018C),
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
                                                                             0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      '1',
+                                                                      style: FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                25.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
                                                                 ),
-                                                              ),
+                                                                IndexedText(),
+                                                                IndexedText(),
+                                                                IndexedText(),
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.07,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: const Color(
+                                                                        0x32B6B6B6),
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                      width: 1.0,
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
+                                                                            0.0,
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      '평균1',
+                                                                      style: FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                23.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                              ],
                                                             ),
-                                                          ],
-                                                        ),
-                                                        Row(
-                                                          mainAxisSize:
-                                                              MainAxisSize.max,
-                                                          children: [
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.05,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x3308018C),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '2',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            25.0,
-                                                                        letterSpacing:
+                                                            Row(
+                                                              mainAxisSize:
+                                                                  MainAxisSize.max,
+                                                              children: [
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.05,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: const Color(
+                                                                        0x3308018C),
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
                                                                             0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      '2',
+                                                                      style: FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                25.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
                                                                 ),
-                                                              ),
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.07,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: FlutterFlowTheme.of(
+                                                                            context)
+                                                                        .secondaryBackground,
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
+                                                                            0.0,
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      getValue(
+                                                                          Constants
+                                                                              .names[5],
+                                                                          "2",
+                                                                          0),
+                                                                      style: FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                23.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.07,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: FlutterFlowTheme.of(
+                                                                            context)
+                                                                        .secondaryBackground,
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
+                                                                            0.0,
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      getValue(
+                                                                          Constants
+                                                                              .names[5],
+                                                                          "2",
+                                                                          1),
+                                                                      style: FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                23.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.07,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: FlutterFlowTheme.of(
+                                                                            context)
+                                                                        .secondaryBackground,
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
+                                                                            0.0,
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      getValue(
+                                                                          Constants
+                                                                              .names[5],
+                                                                          "2",
+                                                                          2),
+                                                                      style: FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                23.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.07,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: const Color(
+                                                                        0x32B6B6B6),
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                      width: 1.0,
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
+                                                                            0.0,
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      getAverage(
+                                                                          Constants
+                                                                              .names[5],
+                                                                          "2"),
+                                                                      style: FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                23.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                              ],
                                                             ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  getValue(
-                                                                      Constants
-                                                                          .names[5],
-                                                                      "2",
-                                                                      0),
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
+                                                            Row(
+                                                              mainAxisSize:
+                                                                  MainAxisSize.max,
+                                                              children: [
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.05,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: const Color(
+                                                                        0x3308018C),
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
                                                                             0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      '3',
+                                                                      style: FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                25.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
                                                                 ),
-                                                              ),
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.07,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: FlutterFlowTheme.of(
+                                                                            context)
+                                                                        .secondaryBackground,
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
+                                                                            0.0,
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      getValue(
+                                                                          Constants
+                                                                              .names[5],
+                                                                          "3",
+                                                                          0),
+                                                                      style: FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                23.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.07,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: FlutterFlowTheme.of(
+                                                                            context)
+                                                                        .secondaryBackground,
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
+                                                                            0.0,
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      getValue(
+                                                                          Constants
+                                                                              .names[5],
+                                                                          "3",
+                                                                          1),
+                                                                      style: FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                23.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.07,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: FlutterFlowTheme.of(
+                                                                            context)
+                                                                        .secondaryBackground,
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
+                                                                            0.0,
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      getValue(
+                                                                          Constants
+                                                                              .names[5],
+                                                                          "3",
+                                                                          2),
+                                                                      style: FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                23.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.07,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: const Color(
+                                                                        0x32B6B6B6),
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                      width: 1.0,
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
+                                                                            0.0,
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      getAverage(
+                                                                          Constants
+                                                                              .names[5],
+                                                                          "3"),
+                                                                      style: FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                23.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                              ],
                                                             ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  getValue(
-                                                                      Constants
-                                                                          .names[5],
-                                                                      "2",
-                                                                      1),
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
+                                                            Row(
+                                                              mainAxisSize:
+                                                                  MainAxisSize.max,
+                                                              children: [
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.05,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: const Color(
+                                                                        0x3308018C),
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
                                                                             0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      '4',
+                                                                      style: FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                25.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
                                                                 ),
-                                                              ),
+                                                                IndexedText(),
+                                                                IndexedText(),
+                                                                IndexedText(),
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.07,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: const Color(
+                                                                        0x32B6B6B6),
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                      width: 1.0,
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
+                                                                            0.0,
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      '평균4',
+                                                                      style: FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                23.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                              ],
                                                             ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  getValue(
-                                                                      Constants
-                                                                          .names[5],
-                                                                      "2",
-                                                                      2),
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
+                                                            Row(
+                                                              mainAxisSize:
+                                                                  MainAxisSize.max,
+                                                              children: [
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.05,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: const Color(
+                                                                        0x3308018C),
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
                                                                             0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      '5',
+                                                                      style: FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                25.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
                                                                 ),
-                                                              ),
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.07,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: FlutterFlowTheme.of(
+                                                                            context)
+                                                                        .secondaryBackground,
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
+                                                                            0.0,
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      getValue(
+                                                                          Constants
+                                                                              .names[5],
+                                                                          "5",
+                                                                          0),
+                                                                      style: FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                23.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.07,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: FlutterFlowTheme.of(
+                                                                            context)
+                                                                        .secondaryBackground,
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
+                                                                            0.0,
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      getValue(
+                                                                          Constants
+                                                                              .names[5],
+                                                                          "5",
+                                                                          1),
+                                                                      style: FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                23.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.07,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: FlutterFlowTheme.of(
+                                                                            context)
+                                                                        .secondaryBackground,
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
+                                                                            0.0,
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      getValue(
+                                                                          Constants
+                                                                              .names[5],
+                                                                          "5",
+                                                                          1),
+                                                                      style: FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                23.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.07,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: const Color(
+                                                                        0x32B6B6B6),
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                      width: 1.0,
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
+                                                                            0.0,
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      getAverage(
+                                                                          Constants
+                                                                              .names[5],
+                                                                          "5"),
+                                                                      style: FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                23.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                              ],
                                                             ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x32B6B6B6),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                  width: 1.0,
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  getAverage(
-                                                                      Constants
-                                                                          .names[5],
-                                                                      "2"),
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
+                                                            Row(
+                                                              mainAxisSize:
+                                                                  MainAxisSize.max,
+                                                              children: [
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.05,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: const Color(
+                                                                        0x3308018C),
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
                                                                             0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      '6',
+                                                                      style: FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                25.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
                                                                 ),
-                                                              ),
+                                                                IndexedText(),
+                                                                IndexedText(),
+                                                                IndexedText(),
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.07,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: const Color(
+                                                                        0x32B6B6B6),
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                      width: 1.0,
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
+                                                                            0.0,
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      '평균6',
+                                                                      style: FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                23.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                              ],
                                                             ),
-                                                          ],
-                                                        ),
-                                                        Row(
-                                                          mainAxisSize:
-                                                              MainAxisSize.max,
-                                                          children: [
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.05,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x3308018C),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '3',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            25.0,
-                                                                        letterSpacing:
+                                                            Row(
+                                                              mainAxisSize:
+                                                                  MainAxisSize.max,
+                                                              children: [
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.05,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: const Color(
+                                                                        0x3308018C),
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
                                                                             0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      '7',
+                                                                      style: FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                25.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
                                                                 ),
-                                                              ),
+                                                                IndexedText(),
+                                                                IndexedText(),
+                                                                IndexedText(),
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.07,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: const Color(
+                                                                        0x32B6B6B6),
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                      width: 1.0,
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
+                                                                            0.0,
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      '평균7',
+                                                                      style: FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                23.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                              ],
                                                             ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  getValue(
-                                                                      Constants
-                                                                          .names[5],
-                                                                      "3",
-                                                                      0),
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
+                                                            Row(
+                                                              mainAxisSize:
+                                                                  MainAxisSize.max,
+                                                              children: [
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.05,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: const Color(
+                                                                        0x3308018C),
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
                                                                             0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      '8',
+                                                                      style: FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                25.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
                                                                 ),
-                                                              ),
+                                                                IndexedText(),
+                                                                IndexedText(),
+                                                                IndexedText(),
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.07,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: const Color(
+                                                                        0x32B6B6B6),
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                      width: 1.0,
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
+                                                                            0.0,
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      '평균8',
+                                                                      style: FlutterFlowTheme.of(
+                                                                              context)
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                23.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                              ],
                                                             ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  getValue(
-                                                                      Constants
-                                                                          .names[5],
-                                                                      "3",
-                                                                      1),
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
+                                                            Row(
+                                                              mainAxisSize:
+                                                                  MainAxisSize.max,
+                                                              children: [
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.05,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: const Color(
+                                                                        0x3308018C),
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
                                                                             0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      '9',
+                                                                      style: FlutterFlowTheme.of(
                                                                               context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                25.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                          ),
+                                                                    ),
+                                                                  ),
                                                                 ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  getValue(
-                                                                      Constants
-                                                                          .names[5],
-                                                                      "3",
-                                                                      2),
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
+                                                                IndexedText(),
+                                                                IndexedText(),
+                                                                IndexedText(),
+                                                                Container(
+                                                                  width: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .width *
+                                                                      0.07,
+                                                                  height: MediaQuery
+                                                                              .sizeOf(
+                                                                                  context)
+                                                                          .height *
+                                                                      0.04,
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: const Color(
+                                                                        0x32B6B6B6),
+                                                                    border:
+                                                                        Border.all(
+                                                                      color: const Color(
+                                                                          0x80000000),
+                                                                      width: 1.0,
+                                                                    ),
+                                                                  ),
+                                                                  child: Align(
+                                                                    alignment:
+                                                                        const AlignmentDirectional(
                                                                             0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
+                                                                            0.0),
+                                                                    child: Text(
+                                                                      '평균9',
+                                                                      style: FlutterFlowTheme.of(
                                                                               context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x32B6B6B6),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                  width: 1.0,
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  getAverage(
-                                                                      Constants
-                                                                          .names[5],
-                                                                      "3"),
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                          ],
-                                                        ),
-                                                        Row(
-                                                          mainAxisSize:
-                                                              MainAxisSize.max,
-                                                          children: [
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.05,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x3308018C),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '4',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            25.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            IndexedText(),
-                                                            IndexedText(),
-                                                            IndexedText(),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x32B6B6B6),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                  width: 1.0,
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '평균4',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                          ],
-                                                        ),
-                                                        Row(
-                                                          mainAxisSize:
-                                                              MainAxisSize.max,
-                                                          children: [
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.05,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x3308018C),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '5',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            25.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  getValue(
-                                                                      Constants
-                                                                          .names[5],
-                                                                      "5",
-                                                                      0),
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  getValue(
-                                                                      Constants
-                                                                          .names[5],
-                                                                      "5",
-                                                                      1),
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .secondaryBackground,
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  getValue(
-                                                                      Constants
-                                                                          .names[5],
-                                                                      "5",
-                                                                      1),
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x32B6B6B6),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                  width: 1.0,
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  getAverage(
-                                                                      Constants
-                                                                          .names[5],
-                                                                      "5"),
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                          ],
-                                                        ),
-                                                        Row(
-                                                          mainAxisSize:
-                                                              MainAxisSize.max,
-                                                          children: [
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.05,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x3308018C),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '6',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            25.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            IndexedText(),
-                                                            IndexedText(),
-                                                            IndexedText(),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x32B6B6B6),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                  width: 1.0,
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '평균6',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                          ],
-                                                        ),
-                                                        Row(
-                                                          mainAxisSize:
-                                                              MainAxisSize.max,
-                                                          children: [
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.05,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x3308018C),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '7',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            25.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            IndexedText(),
-                                                            IndexedText(),
-                                                            IndexedText(),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x32B6B6B6),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                  width: 1.0,
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '평균7',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                          ],
-                                                        ),
-                                                        Row(
-                                                          mainAxisSize:
-                                                              MainAxisSize.max,
-                                                          children: [
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.05,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x3308018C),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '8',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            25.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            IndexedText(),
-                                                            IndexedText(),
-                                                            IndexedText(),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x32B6B6B6),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                  width: 1.0,
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '평균8',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                          ],
-                                                        ),
-                                                        Row(
-                                                          mainAxisSize:
-                                                              MainAxisSize.max,
-                                                          children: [
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.05,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x3308018C),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '9',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            25.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            IndexedText(),
-                                                            IndexedText(),
-                                                            IndexedText(),
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.07,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x32B6B6B6),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                  width: 1.0,
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '평균9',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            23.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
+                                                                          .bodyMedium
+                                                                          .override(
+                                                                            fontFamily:
+                                                                                'Inter',
+                                                                            fontSize:
+                                                                                23.0,
+                                                                            letterSpacing:
+                                                                                0.0,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
                                                                       ),
                                                                 ),
                                                               ),
@@ -16789,19 +16861,27 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
                                                     ),
                                                   ),
                                                 ),
-                                              ],
+                                                const DownloadButton()
+                                              ].addToStart(
+                                                  const SizedBox(width: 40.0)),
+                                              
                                             ),
+                                           ],                                          
                                           ),
+                                         ), 
                                         ],
-                                      ),
+                                      ), 
                                     ),
                                   ),
                                 ),
                               ],
                             ),
+
                           ],
                         ),
                       ),
+                      //-----표6번끝--------------------------------------------
+                      
                       Align(
                         alignment: const Alignment(0.0, 0),
                         child: FlutterFlowButtonTabBar(

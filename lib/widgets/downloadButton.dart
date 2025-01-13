@@ -1,46 +1,45 @@
+import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:test_novel_i_r_i_s3/app_state.dart';
+import 'package:test_novel_i_r_i_s3/data/nobel_data.dart';
+
+import '../utils/functions.dart';
 
 class DownloadButton extends StatelessWidget {
   const DownloadButton({super.key});
 
   @override
-  Align build(BuildContext context){
-
+  Align build(BuildContext context) {
     return Align(
-      alignment:
-          const AlignmentDirectional(
-              0.0, 0.0),
+      alignment: const AlignmentDirectional(0.0, 0.0),
       child: Padding(
-        padding:
-            const EdgeInsetsDirectional
-                .fromSTEB(4.0, 0.0,
-                    0.0, 16.0),
+        padding: const EdgeInsetsDirectional.fromSTEB(4.0, 0.0, 0.0, 16.0),
         child: InkWell(
-          splashColor:
-              Colors.transparent,
-          focusColor:
-              Colors.transparent,
-          hoverColor:
-              Colors.transparent,
-          highlightColor:
-              Colors.transparent,
+          splashColor: Colors.transparent,
+          focusColor: Colors.transparent,
+          hoverColor: Colors.transparent,
+          highlightColor: Colors.transparent,
           onTap: () async {
+            // await saveExcelFile(mapData: toJsonFromStartDateToWeek(FFAppState().CurrentDate));
+            sendJsonData();
             await showDialog(
               context: context,
-              builder:
-                  (alertDialogContext) {
+              builder: (alertDialogContext) {
                 return AlertDialog(
-                  title: const Text('알림'),
-                  content: const Text(
-                      '엑셀파일로 저장되었습니다.'),
+                  title: const Text('저장',  style: TextStyle(fontWeight: FontWeight.bold, ),),
+                  content: const Text('엑셀파일로 저장되었습니다.',  style: TextStyle(fontWeight: FontWeight.w500, ),),
                   actions: [
-                    TextButton(
-                      onPressed: () =>
-                          Navigator.pop(
-                              alertDialogContext),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF08018C), // 버튼 배경색
+                      ),
+                      onPressed: () => Navigator.pop(alertDialogContext),
                       child: const Text(
-                          'Ok'),
+                        'Ok',
+                        style: TextStyle(color: Colors.white), // 버튼 텍스트 색상
+                      ),
                     ),
                   ],
                 );
@@ -48,14 +47,35 @@ class DownloadButton extends StatelessWidget {
             );
           },
           child: const Icon(
-            Icons
-                .file_download_outlined,
-            color:
-                Color(0xFF08018C),
+            Icons.file_download_outlined,
+            color: Color(0xFF08018C),
             size: 40.0,
           ),
         ),
       ),
     );
   }
+
+
+  Future<void> sendJsonData() async {
+    String host = '127.0.0.1';
+    int port = 12345;
+    try {
+      // 소켓 연결
+      Socket socket = FFAppState().socket!;
+      print('서버에 연결됨: $host:$port');
+
+      dynamic jsonData = toJsonFromStartDateToWeek(FFAppState().CurrentDate);
+
+      // JSON 데이터를 문자열로 변환 후 전송
+      String jsonString = jsonEncode(jsonData);
+      socket.write(jsonString);
+      print('데이터 전송 완료: $jsonString');
+
+      
+    } catch (e) {
+      print('소켓 오류 발생: $e');
+    }
+  }
+
 }

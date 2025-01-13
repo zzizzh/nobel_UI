@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:provider/provider.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
@@ -16,6 +15,7 @@ import 'utils/const.dart';
 
 void main() async {
   loadJsonFileWithDefaults();
+
   WidgetsFlutterBinding.ensureInitialized();
   GoRouter.optionURLReflectsImperativeAPIs = true;
   usePathUrlStrategy();
@@ -65,7 +65,7 @@ dynamic loadNestedMapFromFile(String jsonString) {
   final jsonMap = jsonDecode(jsonString);
 
   // 중첩된 Map<String, dynamic> => Map<String, Map<String, MyClass>>
-  return jsonMap.map((outerKey, innerMap) {
+  Map data = jsonMap.map((outerKey, innerMap) {
     return MapEntry(
       outerKey,
       (innerMap as Map<String, dynamic>).map(
@@ -73,6 +73,15 @@ dynamic loadNestedMapFromFile(String jsonString) {
       ),
     );
   });
+
+  for (String name in Constants.names){
+    for(String date in data[name].keys){
+      for(String checkNum in data[name][date].measurements.keys){
+        data[name][date].measurements[checkNum].removeLast();
+      }
+    }
+  }
+  return data;
 }
 
 
