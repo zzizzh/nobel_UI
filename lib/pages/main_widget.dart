@@ -1,5 +1,6 @@
 import 'package:test_novel_i_r_i_s3/widgets/IndexedText.dart';
 import 'package:test_novel_i_r_i_s3/widgets/downloadButton.dart';
+import 'package:test_novel_i_r_i_s3/utils/app_logger.dart';
 
 import '../../data/nobel_data.dart';
 import '../../utils/const.dart';
@@ -15,25 +16,28 @@ import 'package:flutter/scheduler.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
-import 'test_model.dart';
-export 'test_model.dart';
+import 'main_model.dart';
+export 'main_model.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:io';
 import 'package:intl/intl.dart';
 
-class TestWidget extends StatefulWidget {
-  const TestWidget({super.key});
+class MainPage extends StatefulWidget {
+  const MainPage({super.key});
 
   @override
-  State<TestWidget> createState() => _TestWidgetState();
+  State<MainPage> createState() => _MainPageState();
 }
 
-class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
-  late TestModel _model;
-
+class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
+  
+  late MainModel _model;
+  bool _isConnected = false;
+  var logger = AppLogger.instance;
   final scaffoldKey = GlobalKey<ScaffoldState>();
   int tabIndex = 0;
+
   // Map receivedImages = jsonDecode(jsonEncode(Constants.JSON_DATA_MAP));
   List receivedImages = [null, null, null, null, null, null];
 
@@ -41,7 +45,7 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
   void initState() {
     super.initState();
 
-    _model = createModel(context, () => TestModel());
+    _model = createModel(context, () => MainModel());
     startSocket();
 
     // On page load action.
@@ -70,93 +74,112 @@ class _TestWidgetState extends State<TestWidget> with TickerProviderStateMixin {
 
     saveJsonToFile(Constants.dataPath, jsonString); // 저장하거나 파일에 기록
   }
-
-  void startSocket() async {
+  Future<void> startSocket() async {
     
-    try {
-      final socket = await Socket.connect('127.0.0.1', 12345);
-      FFAppState().socket = socket;
+    while (!_isConnected){
 
-      print('Connected to server');
-
-      // 데이터 버퍼 생성
-      Uint8List? buffer;
-
-      // 데이터 수신
-      socket.listen((Uint8List packet) {
-        // 기존 버퍼에 새 데이터 추가
-        if (buffer == null) {
-          buffer = packet;
-        } else {
-          buffer = Uint8List.fromList(buffer! + packet);
+      Socket socket;
+      
+      try {
+        if (FFAppState().socket == null){
+          FFAppState().socket = await Socket.connect('127.0.0.1', 12345);
         }
+        socket = FFAppState().socket!;
+        _isConnected = true;
+        logger.i('Connected to server');
 
-        // 버퍼에 충분한 데이터가 있는지 확인
-        while (buffer != null && buffer!.length >= 4) {
-          // JSON 길이 추출
-          final lengthData = buffer!.sublist(0, 4); // JSON 길이
-          final messageLength = ByteData.sublistView(lengthData).getUint32(0);
+        // 데이터 버퍼 생성
+        Uint8List? buffer;
 
-          // 버퍼에 JSON 데이터까지 충분히 도착했는지 확인
-          if (buffer!.length < 4 + messageLength) {
-            // 아직 데이터가 부족하면 더 기다림
-            break;
+        // 데이터 수신
+        socket.listen((Uint8List packet) {
+          // 기존 버퍼에 새 데이터 추가
+          if (buffer == null) {
+            buffer = packet;
+          } else {
+            buffer = Uint8List.fromList(buffer! + packet);
           }
+      
+          // 버퍼에 충분한 데이터가 있는지 확인
+          while (buffer != null && buffer!.length >= 4) {
+            // JSON 길이 추출
+            final lengthData = buffer!.sublist(0, 4); // JSON 길이
+            final messageLength = ByteData.sublistView(lengthData).getUint32(0);
 
-          // JSON 데이터 추출
-          final jsonData = utf8.decode(buffer!.sublist(4, 4 + messageLength));
-          final receivedMap = json.decode(jsonData);
+            // 버퍼에 JSON 데이터까지 충분히 도착했는지 확인
+            if (buffer!.length < 4 + messageLength) {
+              // 아직 데이터가 부족하면 더 기다림
+              break;
+            }
 
-          String date = receivedMap["date"];
-          String name = receivedMap["name"];
+            // JSON 데이터 추출
+            final jsonData = utf8.decode(buffer!.sublist(4, 4 + messageLength));
+            final receivedMap = json.decode(jsonData);
 
-          if (!Constants.names.contains(name)){
-            return;
-          }
+            String date = receivedMap["date"];
+            String name = receivedMap["name"];
 
-          if (!Measurements.dateList.contains(date)) {
-            Measurements.dateList.add(date);
-            Measurements.dateList.sort((a, b) {
-              // 문자열을 DateTime으로 변환 후 비교
-              DateTime dateA = DateTime.parse(a);
-              DateTime dateB = DateTime.parse(b);
-              return dateA.compareTo(dateB);
+            if (!Constants.names.contains(name)){
+              return;
+            }
+
+            if (!Measurements.dateList.contains(date)) {
+              Measurements.dateList.add(date);
+              Measurements.dateList.sort((a, b) {
+                // 문자열을 DateTime으로 변환 후 비교
+                DateTime dateA = DateTime.parse(a);
+                DateTime dateB = DateTime.parse(b);
+                return dateA.compareTo(dateB);
+              });
+            }
+
+            Measurements data;
+            if (Measurements.data[name]!.containsKey(date)) {
+              data = Measurements.data[name]![date]!;
+              data.writeValue(receivedMap["values"]);
+            } else {
+              data = Measurements.fromServer(receivedMap);
+            }
+
+            Map dateListMap = {"dateList": Measurements.dateList};
+
+            saveNestedMapToFile(Measurements.data);
+            saveJsonToFile(Constants.dateListPath, json.encode(dateListMap));
+
+            // UI 업데이트
+            setState(() {
+              receivedImages[Constants.names.indexOf(receivedMap['name'])] =
+                  base64Decode(receivedMap['image']);
+              // if (!receivedImages[name].containsKey(date)){
+              //   receivedImages[name][date] = [];
+              // }
+              // receivedImages[name][date].add(base64Decode(receivedMap['image']));
             });
+
+            // 처리 완료한 데이터 제거
+            if (buffer!.length > 4 + messageLength) {
+              buffer = buffer!.sublist(4 + messageLength); // 남은 데이터 유지
+            } else {
+              buffer = null; // 모든 데이터 처리 완료
+            }
           }
-
-          Measurements data;
-          if (Measurements.data[name]!.containsKey(date)) {
-            data = Measurements.data[name]![date]!;
-            data.writeValue(receivedMap["values"]);
-          } else {
-            data = Measurements.fromServer(receivedMap);
-          }
-
-          Map dateListMap = {"dateList": Measurements.dateList};
-
-          saveNestedMapToFile(Measurements.data);
-          saveJsonToFile(Constants.dateListPath, json.encode(dateListMap));
-
-          // UI 업데이트
-          setState(() {
-            receivedImages[Constants.names.indexOf(receivedMap['name'])] =
-                base64Decode(receivedMap['image']);
-            // if (!receivedImages[name].containsKey(date)){
-            //   receivedImages[name][date] = [];
-            // }
-            // receivedImages[name][date].add(base64Decode(receivedMap['image']));
-          });
-
-          // 처리 완료한 데이터 제거
-          if (buffer!.length > 4 + messageLength) {
-            buffer = buffer!.sublist(4 + messageLength); // 남은 데이터 유지
-          } else {
-            buffer = null; // 모든 데이터 처리 완료
-          }
-        }
-      });
-    } catch (e) {
-      print('Error: $e');
+        },
+        onError: (error) =>{
+          logger.e("Socket Error : $error"),
+          _isConnected = false,
+          FFAppState().socket = null
+        },
+        onDone : (){
+          logger.i("Conection Closed.");
+          _isConnected = false;
+          FFAppState().socket = null;
+          startSocket();
+        });
+      } catch (e) {
+        logger.e('Error: $e');
+        FFAppState().socket = null;
+        await Future.delayed(const Duration(seconds: 5));
+      }
     }
   }
 

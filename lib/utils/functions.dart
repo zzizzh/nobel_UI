@@ -1,11 +1,8 @@
 
-import 'dart:convert';
 
 import 'package:logger/logger.dart';
-import 'package:test_novel_i_r_i_s3/app_state.dart';
 import 'package:test_novel_i_r_i_s3/utils/app_logger.dart';
 import 'package:test_novel_i_r_i_s3/utils/const.dart';
-import 'dart:collection';
 import '../data/nobel_data.dart';
 import 'dart:io';
 import 'package:excel/excel.dart';
@@ -135,6 +132,49 @@ dynamic toJsonFromStartDateToSaturday(String startDateString){
   return jsonDataMap;
 }
 
+dynamic toJsonFromCurrentMonth(String name){
+  String currentDate = FFAppState().CurrentDate;
+  String startDate = '${currentDate.substring(0, currentDate.length - 2)}01';
+  int currentMonth = FFAppState().getCurrentMonth();
+
+  Map data = Measurements.data;
+
+  List dateList = [];
+  dateList.add(startDate);
+  String? date;
+
+  while(true){
+    date = findNextDate(startDate);
+    if (date == null || FFAppState().getCurrentMonth(date: date) != currentMonth){
+      break;
+    }
+
+    if (date == startDate){
+      // 1. 입력된 날짜 문자열을 DateTime으로 변환
+      DateTime dateTime = DateFormat('yyyy-MM-dd').parse(date);
+
+      // 2. 다음 날짜 계산
+      DateTime nextDate = dateTime.add(const Duration(days: 1));
+
+      date = DateFormat('yyyy-MM-dd').format(nextDate);
+      startDate = date;
+      continue;
+    }
+
+    dateList.add(date);
+    startDate = date;
+  }
+  dynamic jsonMap = {};
+
+  for(String name in Constants.names){
+    for(String date in dateList){
+      jsonMap[date] = data[name][date];
+    }
+  }
+
+  return jsonMap;
+}
+
 /// 자주검사 체크시트 엑셀 파일에 값을 입력하기 위해
 /// 특정 품목의 자주검사 1주일 검사 데이터를 Json 형식의 데이터로 변환
 /// param 1 :    String 시작 날짜(보통 월요일이지만 공휴일일 경우도 있기 때문)
@@ -158,7 +198,7 @@ dynamic toJsonFromStartDateToWeek(String startDate){
         DateTime dateTime = DateFormat('yyyy-MM-dd').parse(date);
 
         // 2. 다음 날짜 계산
-        DateTime nextDate = dateTime.add(Duration(days: 1));
+        DateTime nextDate = dateTime.add(const Duration(days: 1));
 
         date = DateFormat('yyyy-MM-dd').format(nextDate);
       }

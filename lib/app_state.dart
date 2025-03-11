@@ -72,4 +72,21 @@ class FFAppState extends ChangeNotifier {
   set displayDate(String value) {
     _displayDate = value;
   }
+
+  int getCurrentMonth({String date = ''}){
+    String month;
+    if (date == ''){
+      month = CurrentDate.split('-')[1];
+    }
+    else{
+      month = date.split('-')[1];
+    }
+    
+    if (int.tryParse(month) == null){
+      return 0;
+    }
+    else{
+      return int.parse(month);
+    }
+  }
 }

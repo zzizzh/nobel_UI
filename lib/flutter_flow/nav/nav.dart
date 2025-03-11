@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:page_transition/page_transition.dart';
 import 'package:provider/provider.dart';
+import 'package:test_novel_i_r_i_s3/pages/month_management_widget.dart';
 
 import '/index.dart';
 import '/main.dart';
@@ -39,18 +40,30 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
       debugLogDiagnostics: true,
       refreshListenable: appStateNotifier,
       navigatorKey: appNavigatorKey,
-      errorBuilder: (context, state) => TestWidget(),
+      errorBuilder: (context, state) => MainPage(),
       routes: [
         FFRoute(
           name: '_initialize',
           path: '/',
-          builder: (context, _) => TestWidget(),
+          builder: (context, _) => MainPage(),
         ),
         FFRoute(
-          name: 'test',
-          path: '/test',
-          builder: (context, params) => TestWidget(),
-        )
+          name: 'main',
+          path: '/main',
+          builder: (context, params) => MainPage(),
+        ),
+        // FFRoute(
+        //   name: 'month',  // ← 신규 추가
+        //   path: '/nextPage',
+        //   builder: (context, params) {
+        //     final data = params.extra as Map<String, dynamic>;
+        //     return MonthManagementPage(
+        //       param1: data['param1'],
+        //       param2: data['param2'],
+        //       param3: data['param3'],
+        //     );
+        //   },
+        // ),
       ].map((r) => r.toRoute(appStateNotifier)).toList(),
     );
 

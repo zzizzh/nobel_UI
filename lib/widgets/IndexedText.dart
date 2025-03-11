@@ -24,7 +24,7 @@ class IndexedText extends StatelessWidget {
   static int codeListIndex = 0;
   static int passIndex = 0;
   static var logger = AppLogger.instance;
-   
+
   IndexedText(){
     index = _generateText();
     text = index.split("/")[1];
@@ -53,8 +53,8 @@ class IndexedText extends StatelessWidget {
       if(codeListIndex > 5){
         logger.e('이미 모든 인덱스를 생성함.');
       }
-    }
 
+    }
     String generatedText = "${msCodeList[codeListIndex]}/${Constants.indexNames[indexNameIndex]}$number";
     indexNameIndex++;
     if (indexNameIndex == 3){

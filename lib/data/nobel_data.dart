@@ -2,10 +2,6 @@
 // ignore_for_file: slash_for_doc_comments
 
 import 'dart:convert';
-import 'dart:io';
-
-import 'package:test_novel_i_r_i_s3/utils/functions.dart';
-
 import '../utils/app_logger.dart';
 import '../utils/const.dart';
 
@@ -22,6 +18,7 @@ class Measurements{
 
   static var logger = AppLogger.instance; // 로그 출력용
 
+  String productNum = '';                        // 품번
   late String date;                              // 검사 일자
   late String name;                              // 소재 이름(ex: MS-015)
   late List<double> referenceValues;             // 측정 기준값
@@ -31,7 +28,7 @@ class Measurements{
   bool isComplete = false;
 
   // 사용 미정 데이터
-  String productNum = '';
+  // String productNum = '';
   String worker = '';
   String admin = '';
   int numOfNondefective = 0;
@@ -75,6 +72,11 @@ class Measurements{
       
       List values = jsonData['values'];
       date = jsonData['date'];
+      try {
+        productNum = jsonData['productNum'];
+      }catch (e){
+        logger.e('품번 없음.');
+      }
 
       writeValue(values);
       
@@ -85,7 +87,7 @@ class Measurements{
     }
   }
 
-  Measurements(this.date, this.name, this.measurements){
+  Measurements({required this.date, required this.name, required this.measurements, this.productNum=''}){
     List params = Constants.getDataParams(name);
 
     checkList = params[2];
@@ -101,22 +103,27 @@ class Measurements{
 
   factory Measurements.fromJson(Map<String, dynamic> json) {
     
-    return Measurements(json['date'], json['name'], json['measurements']);
+    if (json.containsKey('product num')){
+      return Measurements(date:json['date'], name:json['name'], measurements: json['measurements'], productNum: json['product num']);
+    }
+    else{
+      return Measurements(date:json['date'], name:json['name'], measurements: json['measurements']);
+    }
   }
 
   Map<String, dynamic> toJson(){
     Map<String, dynamic> mapData = {
       'date' : date,
+      'product num' : productNum,
       'name' : name,
       'measurements' : jsonDecode(jsonEncode(measurements)),
       'error count' : getErrorCount()
     };
     List<double> averageValues = averageAllValues();
 
-    int averageIndex = 0;
-
-    for (String checkNum in measurements.keys){
-      mapData['measurements'][checkNum].add(averageValues[averageIndex]);
+    // 각 검사항목 마지막에 평균값 저장
+    for(String checkNum in measurements.keys){
+      mapData['measurements'][checkNum]!.add(averageByCheckNum(checkNum));
     }
 
     return mapData;
@@ -126,7 +133,7 @@ class Measurements{
   /**
    * 모든 측정값 데이터
    * key :        검사 항목
-   * List[0~2] :  초 중 종 측정값
+   * value :      List[0~2] - 초 중 종 측정값
    * auther :     John
    * date :       2024-12-26
    */
