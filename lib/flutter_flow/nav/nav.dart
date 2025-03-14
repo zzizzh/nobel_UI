@@ -36,36 +36,40 @@ class AppStateNotifier extends ChangeNotifier {
 }
 
 GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
-      initialLocation: '/',
-      debugLogDiagnostics: true,
-      refreshListenable: appStateNotifier,
-      navigatorKey: appNavigatorKey,
-      errorBuilder: (context, state) => MainPage(),
-      routes: [
-        FFRoute(
-          name: '_initialize',
-          path: '/',
-          builder: (context, _) => MainPage(),
-        ),
-        FFRoute(
-          name: 'main',
-          path: '/main',
-          builder: (context, params) => MainPage(),
-        ),
-        // FFRoute(
-        //   name: 'month',  // ← 신규 추가
-        //   path: '/nextPage',
-        //   builder: (context, params) {
-        //     final data = params.extra as Map<String, dynamic>;
-        //     return MonthManagementPage(
-        //       param1: data['param1'],
-        //       param2: data['param2'],
-        //       param3: data['param3'],
-        //     );
-        //   },
-        // ),
-      ].map((r) => r.toRoute(appStateNotifier)).toList(),
-    );
+  initialLocation: '/',
+  debugLogDiagnostics: true,
+  refreshListenable: appStateNotifier,
+  navigatorKey: appNavigatorKey,
+  errorBuilder: (context, state) => MainPage(),
+  routes: [
+    FFRoute(
+      name: '_initialize',
+      path: '/',
+      builder: (context, _) => MainPage(),
+    ),
+    FFRoute(
+      name: 'main',
+      path: '/main',
+      builder: (context, params) => MainPage(),
+    ),
+    FFRoute(
+      name: 'monthManagement',  // ← 신규 추가
+      path: '/monthManagement',
+      builder: (context, params) {
+        final name = params.getParam<String>('name', ParamType.String) ?? '';
+        final checkNum = params.getParam<String>('checkNum', ParamType.String) ?? '';
+        final month = params.getParam<String>('month', ParamType.String) ?? '';
+        final jsonMap = params.getParam<Map<String, dynamic>>('jsonMap', ParamType.JSON) ?? '';
+        return MonthManagementPage(
+          name: name,
+          checkNum: checkNum,
+          month: month,
+          jsonMap: jsonMap,
+        );
+      },
+    ),
+  ].map((r) => r.toRoute(appStateNotifier)).toList(),
+);
 
 extension NavParamExtensions on Map<String, String?> {
   Map<String, String> get withoutNulls => Map.fromEntries(

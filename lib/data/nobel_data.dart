@@ -241,7 +241,7 @@ class Measurements{
     
     double result = 0;
     List valueList = measurements[checkNum]!;
-    for (double value in valueList){
+    for (double value in valueList.map((e) => e.toDouble())){
       result += value;
     }
 

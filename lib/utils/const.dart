@@ -1,5 +1,4 @@
 // ignore_for_file: constant_identifier_names, non_constant_identifier_names
-import 'package:path/path.dart' as p;
 
 import '../data/nobel_data.dart';
 
@@ -7,9 +6,9 @@ class Constants {
   // Prevent instantiation
   Constants._();
 
-  static const String dataPath = "C:\\UND\\data.json";
-  static const String dateListPath = "C:\\UND\\dateList.json";
-  static const String excelPath = "C:\\UND\\form.xlsx";
+  static const String dataPath = "C:\\nobel\\data.json";
+  static const String dateListPath = "C:\\nobel\\dateList.json";
+  static const String excelPath = "C:\\nobel\\form.xlsx";
 
   static const List names = [
     'MS-010',

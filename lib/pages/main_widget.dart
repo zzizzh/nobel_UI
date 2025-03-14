@@ -1,6 +1,7 @@
-import 'package:test_novel_i_r_i_s3/widgets/IndexedText.dart';
+import 'package:test_novel_i_r_i_s3/widgets/IndexedContainer.dart';
 import 'package:test_novel_i_r_i_s3/widgets/downloadButton.dart';
 import 'package:test_novel_i_r_i_s3/utils/app_logger.dart';
+import 'package:test_novel_i_r_i_s3/widgets/clickableContainer.dart';
 
 import '../../data/nobel_data.dart';
 import '../../utils/const.dart';
@@ -14,14 +15,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'main_model.dart';
 export 'main_model.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:io';
-import 'package:intl/intl.dart';
 
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
@@ -37,9 +36,11 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
   var logger = AppLogger.instance;
   final scaffoldKey = GlobalKey<ScaffoldState>();
   int tabIndex = 0;
+  String currentName = 'MS-010';
 
+  static const double baseWidth = 1920.0;
   // Map receivedImages = jsonDecode(jsonEncode(Constants.JSON_DATA_MAP));
-  List receivedImages = [null, null, null, null, null, null];
+  List receivedImages = [[null, null], [null, null], [null, null], [null, null], [null, null], [null, null]];
 
   @override
   void initState() {
@@ -74,6 +75,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
 
     saveJsonToFile(Constants.dataPath, jsonString); // 저장하거나 파일에 기록
   }
+  
   Future<void> startSocket() async {
     
     while (!_isConnected){
@@ -93,6 +95,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
 
         // 데이터 수신
         socket.listen((Uint8List packet) {
+          logger.i('get data from server!!');
           // 기존 버퍼에 새 데이터 추가
           if (buffer == null) {
             buffer = packet;
@@ -115,47 +118,107 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
             // JSON 데이터 추출
             final jsonData = utf8.decode(buffer!.sublist(4, 4 + messageLength));
             final receivedMap = json.decode(jsonData);
+            
+            // 측정값
+            if (receivedMap.containsKey('date')){
+              String date = receivedMap["date"];
+              String name = receivedMap["name"];
 
-            String date = receivedMap["date"];
-            String name = receivedMap["name"];
+              if (!Constants.names.contains(name)){
+                return;
+              }
 
-            if (!Constants.names.contains(name)){
-              return;
-            }
+              if (!Measurements.dateList.contains(date)) {
+                Measurements.dateList.add(date);
+                Measurements.dateList.sort((a, b) {
+                  // 문자열을 DateTime으로 변환 후 비교
+                  DateTime dateA = DateTime.parse(a);
+                  DateTime dateB = DateTime.parse(b);
+                  return dateA.compareTo(dateB);
+                });
+              }
+              
+              Measurements data;
+              if (Measurements.data[name]!.containsKey(date)) {
+                data = Measurements.data[name]![date]!;
+                data.writeValue(receivedMap["values"]);
+              } else {
+                data = Measurements.fromServer(receivedMap);
+              }
 
-            if (!Measurements.dateList.contains(date)) {
-              Measurements.dateList.add(date);
-              Measurements.dateList.sort((a, b) {
-                // 문자열을 DateTime으로 변환 후 비교
-                DateTime dateA = DateTime.parse(a);
-                DateTime dateB = DateTime.parse(b);
-                return dateA.compareTo(dateB);
+              Map dateListMap = {"dateList": Measurements.dateList};
+
+              saveNestedMapToFile(Measurements.data);
+              saveJsonToFile(Constants.dateListPath, json.encode(dateListMap));
+
+              // UI 업데이트
+              setState(() {
+                receivedImages[Constants.names.indexOf(receivedMap['name'])] = [];
+                receivedImages[Constants.names.indexOf(receivedMap['name'])].add(base64Decode(receivedMap['image'][0]));
+                receivedImages[Constants.names.indexOf(receivedMap['name'])].add(base64Decode(receivedMap['image'][1]));
+                // if (!receivedImages[name].containsKey(date)){
+                //   receivedImages[name][date] = [];
+                // }
+                // receivedImages[name][date].add(base64Decode(receivedMap['image']));
               });
             }
-
-            Measurements data;
-            if (Measurements.data[name]!.containsKey(date)) {
-              data = Measurements.data[name]![date]!;
-              data.writeValue(receivedMap["values"]);
-            } else {
-              data = Measurements.fromServer(receivedMap);
+            
+            // 차트 데이터
+            else if (receivedMap.containsKey('sigma=')){
+              FFAppState().setOutputDatas(receivedMap);
             }
-
-            Map dateListMap = {"dateList": Measurements.dateList};
-
-            saveNestedMapToFile(Measurements.data);
-            saveJsonToFile(Constants.dateListPath, json.encode(dateListMap));
-
-            // UI 업데이트
-            setState(() {
-              receivedImages[Constants.names.indexOf(receivedMap['name'])] =
-                  base64Decode(receivedMap['image']);
-              // if (!receivedImages[name].containsKey(date)){
-              //   receivedImages[name][date] = [];
-              // }
-              // receivedImages[name][date].add(base64Decode(receivedMap['image']));
-            });
-
+            // error
+            else if (receivedMap.containsKey('error')){
+              showDialog(
+                context: context,
+                builder: (alertDialogContext) {
+                  return AlertDialog(
+                    title: const Text('오류',  style: TextStyle(fontWeight: FontWeight.bold, ),),
+                    content: const Text('엑셀 파일을 종료하고 다시 시도해 주세요.',  style: TextStyle(fontWeight: FontWeight.w500, ),),
+                    actions: [
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF08018C), // 버튼 배경색
+                        ),
+                        onPressed: () => Navigator.pop(alertDialogContext),
+                        child: const Text(
+                          'Ok',
+                          style: TextStyle(color: Colors.white), // 버튼 텍스트 색상
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              );
+              FFAppState().setIsLoading(false);
+            }
+            else if (receivedMap.containsKey('done')){
+              showDialog(
+                context: context,
+                builder: (alertDialogContext) {
+                  return AlertDialog(
+                    title: const Text('완료',  style: TextStyle(fontWeight: FontWeight.bold, ),),
+                    content: const Text('엑셀 파일 생성을 완료했습니다.',  style: TextStyle(fontWeight: FontWeight.w500, ),),
+                    actions: [
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF08018C), // 버튼 배경색
+                        ),
+                        onPressed: () => Navigator.pop(alertDialogContext),
+                        child: const Text(
+                          'Ok',
+                          style: TextStyle(color: Colors.white), // 버튼 텍스트 색상
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              );
+              FFAppState().setIsLoading(false);
+            }
+            else if (receivedMap.containsKey('connect')){
+              FFAppState().setPLCConnect(true);
+            }
             // 처리 완료한 데이터 제거
             if (buffer!.length > 4 + messageLength) {
               buffer = buffer!.sublist(4 + messageLength); // 남은 데이터 유지
@@ -185,9 +248,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
 
   // Future<void> saveExcelFile(String startDate){
 
-  // }
+  // } 
 
-  Future<void> saveJsonToFile(String filePath, String jsonString) async {
+  Future<void> saveJsonToFile(String filePath , String jsonString) async {
     try {
       // 파일 경로에서 폴더 경로 추출
       final directoryPath = Directory(filePath).parent.path;
@@ -221,31 +284,26 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     context.watch<FFAppState>();
 
-    IndexedText.initState();
-
-    return GestureDetector(
-      onTap: () {
-        FocusScope.of(context).unfocus();
-        FocusManager.instance.primaryFocus?.unfocus();
-      },
-      child: Scaffold(
+    IndexedContainer.initState();
+    
+    return Scaffold(
         key: scaffoldKey,
         backgroundColor: FlutterFlowTheme.of(context).primaryBackground,
-        body: SafeArea(
+        body: LayoutBuilder(
+          builder: (context, constraints) {
+            double screenWidth = constraints.maxWidth;
+            double scaleFactor = screenWidth / baseWidth;
+
+            return SafeArea(
           top: true,
-          child: Column(
+          child: Stack(
+            children : [
+              Column(
             mainAxisSize: MainAxisSize.max,
             mainAxisAlignment: MainAxisAlignment.start,
             children: [
               Expanded(
-                child: InkWell(
-                  splashColor: Colors.transparent,
-                  focusColor: Colors.transparent,
-                  hoverColor: Colors.transparent,
-                  highlightColor: Colors.transparent,
-                  onDoubleTap: () async {
-                    safeSetState(() {});
-                  },
+                
                   child: Column(
                     children: [
                       Expanded(
@@ -277,8 +335,8 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                         children: [
                                           Padding(
                                             padding:
-                                                const EdgeInsetsDirectional.fromSTEB(
-                                                    24.0, 0.0, 0.0, 0.0),
+                                                EdgeInsetsDirectional.fromSTEB(
+                                                    24.0, 0.0 * scaleFactor, 0.0 * scaleFactor, 0.0 * scaleFactor),
                                             child: Container(
                                               width: MediaQuery.sizeOf(context)
                                                       .width *
@@ -297,9 +355,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                 children: [
                                                   Padding(
                                                     padding:
-                                                        const EdgeInsetsDirectional
-                                                            .fromSTEB(4.0, 4.0,
-                                                                4.0, 4.0),
+                                                        EdgeInsetsDirectional
+                                                            .fromSTEB(4.0 * scaleFactor, 4.0 * scaleFactor,
+                                                                4.0 * scaleFactor, 4.0 * scaleFactor),
                                                     child: ClipRRect(
                                                       borderRadius:
                                                           BorderRadius.circular(
@@ -317,9 +375,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                   ),
                                                   Padding(
                                                     padding:
-                                                        const EdgeInsetsDirectional
-                                                            .fromSTEB(8.0, 0.0,
-                                                                0.0, 0.0),
+                                                        EdgeInsetsDirectional
+                                                            .fromSTEB(8.0 * scaleFactor, 0.0 * scaleFactor,
+                                                                0.0 * scaleFactor, 0.0 * scaleFactor),
                                                     child: Text(
                                                       '자주검사 체크시트',
                                                       textAlign:
@@ -329,7 +387,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                           .bodyMedium
                                                           .override(
                                                             fontFamily: 'Inter',
-                                                            fontSize: 50.0,
+                                                            fontSize: scaleFactor * 50.0,
                                                             letterSpacing: 0.0,
                                                             fontWeight:
                                                                 FontWeight.w600,
@@ -404,8 +462,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       'Inter',
                                                                   color: Colors
                                                                       .black,
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -450,8 +507,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                 .override(
                                                                   fontFamily:
                                                                       'Inter',
-                                                                  fontSize:
-                                                                      30.0,
+                                                                  fontSize: scaleFactor * 30.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -497,8 +553,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       'Inter',
                                                                   color: Colors
                                                                       .black,
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -543,8 +598,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                 .override(
                                                                   fontFamily:
                                                                       'Inter',
-                                                                  fontSize:
-                                                                      23.0,
+                                                                  fontSize: scaleFactor * 23.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -594,8 +648,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       'Inter',
                                                                   color: Colors
                                                                       .black,
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -640,8 +693,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                 .override(
                                                                   fontFamily:
                                                                       'Inter',
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -687,8 +739,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       'Inter',
                                                                   color: Colors
                                                                       .black,
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -780,8 +831,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       'Inter',
                                                                   color: Colors
                                                                       .black,
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -814,12 +864,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                         ),
                                                         child: Padding(
                                                           padding:
-                                                              const EdgeInsetsDirectional
+                                                              EdgeInsetsDirectional
                                                                   .fromSTEB(
                                                                       0.0,
-                                                                      0.0,
-                                                                      4.0,
-                                                                      0.0),
+                                                                      0.0 * scaleFactor,
+                                                                      4.0 * scaleFactor,
+                                                                      0.0 * scaleFactor),
                                                           child: Row(
                                                             mainAxisSize:
                                                                 MainAxisSize
@@ -834,12 +884,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                         0.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: const EdgeInsetsDirectional
+                                                                  padding: EdgeInsetsDirectional
                                                                       .fromSTEB(
-                                                                          4.0,
-                                                                          0.0,
-                                                                          4.0,
-                                                                          0.0),
+                                                                          4.0 * scaleFactor,
+                                                                          0.0 * scaleFactor,
+                                                                          4.0 * scaleFactor,
+                                                                          0.0 * scaleFactor),
                                                                   child:
                                                                       Container(
                                                                     width: MediaQuery.sizeOf(context)
@@ -864,8 +914,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                     .override(
                                                                       fontFamily:
                                                                           'Inter',
-                                                                      fontSize:
-                                                                          22.0,
+                                                                      fontSize: scaleFactor * 15.0,
                                                                       letterSpacing:
                                                                           0.0,
                                                                       fontWeight:
@@ -879,12 +928,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                         0.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: const EdgeInsetsDirectional
+                                                                  padding: EdgeInsetsDirectional
                                                                       .fromSTEB(
-                                                                          12.0,
-                                                                          0.0,
-                                                                          4.0,
-                                                                          0.0),
+                                                                          12.0 * scaleFactor,
+                                                                          0.0 * scaleFactor,
+                                                                          4.0 * scaleFactor,
+                                                                          0.0 * scaleFactor),
                                                                   child:
                                                                       Container(
                                                                     width: MediaQuery.sizeOf(context)
@@ -915,8 +964,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                     .override(
                                                                       fontFamily:
                                                                           'Inter',
-                                                                      fontSize:
-                                                                          22.0,
+                                                                      fontSize: scaleFactor * 15.0,
                                                                       letterSpacing:
                                                                           0.0,
                                                                       fontWeight:
@@ -930,12 +978,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                         0.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: const EdgeInsetsDirectional
+                                                                  padding: EdgeInsetsDirectional
                                                                       .fromSTEB(
-                                                                          12.0,
-                                                                          0.0,
-                                                                          4.0,
-                                                                          0.0),
+                                                                          12.0 * scaleFactor,
+                                                                          0.0 * scaleFactor,
+                                                                          4.0 * scaleFactor,
+                                                                          0.0 * scaleFactor),
                                                                   child:
                                                                       Container(
                                                                     width: MediaQuery.sizeOf(context)
@@ -966,8 +1014,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                     .override(
                                                                       fontFamily:
                                                                           'Inter',
-                                                                      fontSize:
-                                                                          22.0,
+                                                                      fontSize: scaleFactor * 15.0,
                                                                       letterSpacing:
                                                                           0.0,
                                                                       fontWeight:
@@ -981,12 +1028,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                         0.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: const EdgeInsetsDirectional
+                                                                  padding: EdgeInsetsDirectional
                                                                       .fromSTEB(
-                                                                          12.0,
-                                                                          0.0,
-                                                                          4.0,
-                                                                          0.0),
+                                                                          12.0 * scaleFactor,
+                                                                          0.0 * scaleFactor,
+                                                                          4.0 * scaleFactor,
+                                                                          0.0 * scaleFactor),
                                                                   child:
                                                                       Container(
                                                                     width: MediaQuery.sizeOf(context)
@@ -1017,8 +1064,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                     .override(
                                                                       fontFamily:
                                                                           'Inter',
-                                                                      fontSize:
-                                                                          22.0,
+                                                                      fontSize: scaleFactor * 15.0,
                                                                       letterSpacing:
                                                                           0.0,
                                                                       fontWeight:
@@ -1066,8 +1112,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       'Inter',
                                                                   color: Colors
                                                                       .black,
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -1110,8 +1155,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                 .override(
                                                                   fontFamily:
                                                                       'Inter',
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -1165,9 +1209,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                   ),
                                                 ),
                                                 child: Padding(
-                                                  padding: const EdgeInsetsDirectional
+                                                  padding: EdgeInsetsDirectional
                                                       .fromSTEB(
-                                                          8.0, 8.0, 8.0, 8.0),
+                                                          8.0, 8.0 * scaleFactor, 8.0 * scaleFactor, 8.0 * scaleFactor),
                                                   child: ClipRRect(
                                                     borderRadius:
                                                         BorderRadius.circular(
@@ -1186,9 +1230,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                               alignment: const AlignmentDirectional(
                                                   0.0, 0.0),
                                               child: Padding(
-                                                padding: const EdgeInsetsDirectional
+                                                padding: EdgeInsetsDirectional
                                                     .fromSTEB(
-                                                        0.0, 8.0, 0.0, 0.0),
+                                                        0.0, 8.0 * scaleFactor, 0.0 * scaleFactor, 0.0 * scaleFactor),
                                                 child: Container(
                                                   width:
                                                       MediaQuery.sizeOf(context)
@@ -1234,9 +1278,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                               alignment: const AlignmentDirectional(
                                                   0.0, 1.0),
                                               child: Padding(
-                                                padding: const EdgeInsetsDirectional
+                                                padding: EdgeInsetsDirectional
                                                     .fromSTEB(
-                                                        0.0, 8.0, 0.0, 0.0),
+                                                        0.0, 8.0 * scaleFactor, 0.0 * scaleFactor, 0.0 * scaleFactor),
                                                 child: Container(
                                                   width:
                                                       MediaQuery.sizeOf(context)
@@ -1256,9 +1300,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                   ),
                                                   child: Padding(
                                                     padding:
-                                                        const EdgeInsetsDirectional
-                                                            .fromSTEB(16.0, 4.0,
-                                                                16.0, 0.0),
+                                                        EdgeInsetsDirectional
+                                                            .fromSTEB(16.0 * scaleFactor, 4.0 * scaleFactor,
+                                                                16.0 * scaleFactor, 0.0 * scaleFactor),
                                                     child: Text(
                                                       '1. 이상 발생시 즉시 QA에 통보\n2. 자주검사 기준서 필히 숙지 할 것.\n3. 검사주기가 전수 검사인 제품은 불량내용 및 수량만 체크할 것.\n(양호 :O  불량발생:X  치수:치수기입)',
                                                       style: FlutterFlowTheme
@@ -1266,7 +1310,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                           .bodyMedium
                                                           .override(
                                                             fontFamily: 'Inter',
-                                                            fontSize: 23.0,
+                                                            fontSize: scaleFactor * 23.0,
                                                             letterSpacing: 0.0,
                                                             fontWeight:
                                                                 FontWeight.w600,
@@ -1295,11 +1339,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                 mainAxisAlignment:
                                                     MainAxisAlignment.center,
                                                 children: [
+                                                  
                                                   Padding(
                                                     padding:
-                                                        const EdgeInsetsDirectional
-                                                            .fromSTEB(0.0, 0.0,
-                                                                16.0, 0.0),
+                                                        EdgeInsetsDirectional
+                                                            .fromSTEB(0.0 * scaleFactor, 0.0 * scaleFactor,
+                                                                16.0 * scaleFactor, 0.0 * scaleFactor),
                                                     child: InkWell(
                                                       splashColor:
                                                           Colors.transparent,
@@ -1333,12 +1378,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                             0.0, 0.0),
                                                     child: Padding(
                                                       padding:
-                                                          const EdgeInsetsDirectional
+                                                          EdgeInsetsDirectional
                                                               .fromSTEB(
                                                                   0.0,
-                                                                  0.0,
-                                                                  16.0,
-                                                                  0.0),
+                                                                  0.0 * scaleFactor,
+                                                                  16.0 * scaleFactor,
+                                                                  0.0 * scaleFactor),
                                                       child: Text(
                                                         '날짜 : ',
                                                         textAlign:
@@ -1349,7 +1394,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                             .override(
                                                               fontFamily:
                                                                   'Inter',
-                                                              fontSize: 35.0,
+                                                              fontSize: scaleFactor * 35.0,
                                                               letterSpacing:
                                                                   0.0,
                                                               fontWeight:
@@ -1372,7 +1417,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                           .bodyMedium
                                                           .override(
                                                             fontFamily: 'Inter',
-                                                            fontSize: 35.0,
+                                                            fontSize: scaleFactor * 35.0,
                                                             letterSpacing: 0.0,
                                                             fontWeight:
                                                                 FontWeight.w600,
@@ -1381,9 +1426,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                   ),
                                                   Padding(
                                                     padding:
-                                                        const EdgeInsetsDirectional
-                                                            .fromSTEB(16.0, 0.0,
-                                                                0.0, 0.0),
+                                                        EdgeInsetsDirectional
+                                                            .fromSTEB(16.0 * scaleFactor, 0.0 * scaleFactor,
+                                                                0.0 * scaleFactor, 0.0 * scaleFactor),
                                                     child: InkWell(
                                                       splashColor:
                                                           Colors.transparent,
@@ -1423,8 +1468,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       .override(
                                                                         fontFamily:
                                                                             'Inter Tight',
-                                                                        fontSize:
-                                                                            32.0,
+                                                                        fontSize: scaleFactor * 32.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -1497,9 +1541,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                   ),
                                                   Padding(
                                                     padding:
-                                                        const EdgeInsetsDirectional
-                                                            .fromSTEB(16.0, 0.0,
-                                                                0.0, 0.0),
+                                                        EdgeInsetsDirectional
+                                                            .fromSTEB(16.0 * scaleFactor, 0.0 * scaleFactor,
+                                                                0.0 * scaleFactor, 0.0 * scaleFactor),
                                                     child: InkWell(
                                                       splashColor:
                                                           Colors.transparent,
@@ -1576,7 +1620,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                   'Inter',
                                                               color:
                                                                   Colors.white,
-                                                              fontSize: 25.0,
+                                                              fontSize: scaleFactor * 25.0,
                                                               letterSpacing:
                                                                   0.0,
                                                               fontWeight:
@@ -1616,7 +1660,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                             .override(
                                                               fontFamily:
                                                                   'Inter',
-                                                              fontSize: 25.0,
+                                                              fontSize: scaleFactor * 25.0,
                                                               letterSpacing:
                                                                   0.0,
                                                               fontWeight:
@@ -1630,8 +1674,8 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                               ),
                                             ),
                                             Padding(
-                                              padding: const EdgeInsetsDirectional
-                                                  .fromSTEB(0.0, 8.0, 0.0, 8.0),
+                                              padding: EdgeInsetsDirectional
+                                                  .fromSTEB(0.0 * scaleFactor, 8.0 * scaleFactor, 0.0 * scaleFactor, 8.0 * scaleFactor),
                                               child: Container(
                                                 width:
                                                     MediaQuery.sizeOf(context)
@@ -1650,31 +1694,36 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                   ),
                                                 ),
                                                 child: Padding(
-                                                  padding: const EdgeInsetsDirectional
+                                                  padding: EdgeInsetsDirectional
                                                       .fromSTEB(
-                                                          8.0, 8.0, 8.0, 8.0),
-                                                  child: ClipRRect(
+                                                          8.0, 8.0 * scaleFactor, 8.0 * scaleFactor, 8.0 * scaleFactor),
+                                                  child: InkWell(
+                                                    onTap: () {
+                                                      FFAppState().setIndex();
+                                                    },
+                                                    child: ClipRRect(
                                                     borderRadius:
                                                         BorderRadius.circular(
                                                             0.0),
                                                     child: receivedImages[_model
-                                                                .tabBarCurrentIndex] !=
+                                                                .tabBarCurrentIndex][FFAppState().index] !=
                                                             null
                                                         ? Image.memory(
                                                             receivedImages[_model
-                                                                .tabBarCurrentIndex]!,
+                                                                .tabBarCurrentIndex][FFAppState().index]!,
                                                             height: 300,
                                                             width:
                                                                 double.infinity,
                                                             fit: BoxFit
                                                                 .fitHeight,
                                                           )
-                                                        : Image.network(
-                                                            'https://picsum.photos/seed/510/60',
+                                                        : Image.asset(
+                                                            'assets/images/blank.png',
                                                             width: 200.0,
                                                             height: 200.0,
                                                             fit: BoxFit.cover,
                                                           ),
+                                                    ),
                                                   ),
                                                 ),
                                               ),
@@ -1693,9 +1742,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                           0.0, 0.0),
                                                   child: Padding(
                                                     padding:
-                                                        const EdgeInsetsDirectional
-                                                            .fromSTEB(2.0, 2.0,
-                                                                2.0, 2.0),
+                                                        EdgeInsetsDirectional
+                                                            .fromSTEB(2.0 * scaleFactor, 2.0 * scaleFactor,
+                                                                2.0 * scaleFactor, 2.0 * scaleFactor),
                                                     child: Container(
                                                       width: MediaQuery.sizeOf(
                                                                   context)
@@ -1760,8 +1809,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                               'Inter',
                                                                           color:
                                                                               Colors.white,
-                                                                          fontSize:
-                                                                              25.0,
+                                                                          fontSize: scaleFactor * 25.0,
                                                                           letterSpacing:
                                                                               0.0,
                                                                           fontWeight:
@@ -1804,8 +1852,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                               'Inter',
                                                                           color:
                                                                               Colors.white,
-                                                                          fontSize:
-                                                                              25.0,
+                                                                          fontSize: scaleFactor * 25.0,
                                                                           letterSpacing:
                                                                               0.0,
                                                                           fontWeight:
@@ -1848,8 +1895,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                               'Inter',
                                                                           color:
                                                                               Colors.white,
-                                                                          fontSize:
-                                                                              25.0,
+                                                                          fontSize: scaleFactor * 25.0,
                                                                           letterSpacing:
                                                                               0.0,
                                                                           fontWeight:
@@ -1892,8 +1938,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                               'Inter',
                                                                           color:
                                                                               Colors.white,
-                                                                          fontSize:
-                                                                              25.0,
+                                                                          fontSize: scaleFactor * 25.0,
                                                                           letterSpacing:
                                                                               0.0,
                                                                           fontWeight:
@@ -1937,8 +1982,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                               'Inter',
                                                                           color:
                                                                               Colors.white,
-                                                                          fontSize:
-                                                                              25.0,
+                                                                          fontSize: scaleFactor * 25.0,
                                                                           letterSpacing:
                                                                               0.0,
                                                                           fontWeight:
@@ -1954,51 +1998,10 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                 MainAxisSize
                                                                     .max,
                                                             children: [
-                                                              Container(
-                                                                width: MediaQuery.sizeOf(
-                                                                            context)
-                                                                        .width *
-                                                                    0.05,
-                                                                height: MediaQuery.sizeOf(
-                                                                            context)
-                                                                        .height *
-                                                                    0.04,
-                                                                decoration:
-                                                                    BoxDecoration(
-                                                                  color: const Color(
-                                                                      0x3308018C),
-                                                                  border: Border
-                                                                      .all(
-                                                                    color: const Color(
-                                                                        0x80000000),
-                                                                  ),
-                                                                ),
-                                                                child: Align(
-                                                                  alignment:
-                                                                      const AlignmentDirectional(
-                                                                          0.0,
-                                                                          0.0),
-                                                                  child: Text(
-                                                                    '1',
-                                                                    style: FlutterFlowTheme.of(
-                                                                            context)
-                                                                        .bodyMedium
-                                                                        .override(
-                                                                          fontFamily:
-                                                                              'Inter',
-                                                                          fontSize:
-                                                                              25.0,
-                                                                          letterSpacing:
-                                                                              0.0,
-                                                                          fontWeight:
-                                                                              FontWeight.w600,
-                                                                        ),
-                                                                  ),
-                                                                ),
-                                                              ),
-                                                              IndexedText(),
-                                                              IndexedText(),
-                                                              IndexedText(),
+                                                              ClickableContainer(scaleFactor: scaleFactor, name: currentName, text: '1'),
+                                                              IndexedContainer(scaleFactor: scaleFactor),
+                                                              IndexedContainer(scaleFactor: scaleFactor),
+                                                              IndexedContainer(scaleFactor: scaleFactor),
                                                               Container(
                                                                 width: MediaQuery.sizeOf(
                                                                             context)
@@ -2032,8 +2035,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                         .override(
                                                                           fontFamily:
                                                                               'Inter',
-                                                                          fontSize:
-                                                                              23.0,
+                                                                          fontSize: scaleFactor * 23.0,
                                                                           letterSpacing:
                                                                               0.0,
                                                                           fontWeight:
@@ -2049,51 +2051,10 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                 MainAxisSize
                                                                     .max,
                                                             children: [
-                                                              Container(
-                                                                width: MediaQuery.sizeOf(
-                                                                            context)
-                                                                        .width *
-                                                                    0.05,
-                                                                height: MediaQuery.sizeOf(
-                                                                            context)
-                                                                        .height *
-                                                                    0.04,
-                                                                decoration:
-                                                                    BoxDecoration(
-                                                                  color: const Color(
-                                                                      0x3308018C),
-                                                                  border: Border
-                                                                      .all(
-                                                                    color: const Color(
-                                                                        0x80000000),
-                                                                  ),
-                                                                ),
-                                                                child: Align(
-                                                                  alignment:
-                                                                      const AlignmentDirectional(
-                                                                          0.0,
-                                                                          0.0),
-                                                                  child: Text(
-                                                                    '2',
-                                                                    style: FlutterFlowTheme.of(
-                                                                            context)
-                                                                        .bodyMedium
-                                                                        .override(
-                                                                          fontFamily:
-                                                                              'Inter',
-                                                                          fontSize:
-                                                                              25.0,
-                                                                          letterSpacing:
-                                                                              0.0,
-                                                                          fontWeight:
-                                                                              FontWeight.w600,
-                                                                        ),
-                                                                  ),
-                                                                ),
-                                                              ),
-                                                              IndexedText(),
-                                                              IndexedText(),
-                                                              IndexedText(),
+                                                              ClickableContainer(scaleFactor: scaleFactor, name: currentName, text: '2'),
+                                                              IndexedContainer(scaleFactor: scaleFactor),
+                                                              IndexedContainer(scaleFactor: scaleFactor),
+                                                              IndexedContainer(scaleFactor: scaleFactor),
                                                               Container(
                                                                 width: MediaQuery.sizeOf(
                                                                             context)
@@ -2127,8 +2088,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                         .override(
                                                                           fontFamily:
                                                                               'Inter',
-                                                                          fontSize:
-                                                                              23.0,
+                                                                          fontSize: scaleFactor * 23.0,
                                                                           letterSpacing:
                                                                               0.0,
                                                                           fontWeight:
@@ -2144,48 +2104,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                 MainAxisSize
                                                                     .max,
                                                             children: [
-                                                              Container(
-                                                                width: MediaQuery.sizeOf(
-                                                                            context)
-                                                                        .width *
-                                                                    0.05,
-                                                                height: MediaQuery.sizeOf(
-                                                                            context)
-                                                                        .height *
-                                                                    0.04,
-                                                                decoration:
-                                                                    BoxDecoration(
-                                                                  color: const Color(
-                                                                      0x3308018C),
-                                                                  border: Border
-                                                                      .all(
-                                                                    color: const Color(
-                                                                        0x80000000),
-                                                                  ),
-                                                                ),
-                                                                child: Align(
-                                                                  alignment:
-                                                                      const AlignmentDirectional(
-                                                                          0.0,
-                                                                          0.0),
-                                                                  child: Text(
-                                                                    '3',
-                                                                    style: FlutterFlowTheme.of(
-                                                                            context)
-                                                                        .bodyMedium
-                                                                        .override(
-                                                                          fontFamily:
-                                                                              'Inter',
-                                                                          fontSize:
-                                                                              25.0,
-                                                                          letterSpacing:
-                                                                              0.0,
-                                                                          fontWeight:
-                                                                              FontWeight.w600,
-                                                                        ),
-                                                                  ),
-                                                                ),
-                                                              ),
+                                                              ClickableContainer(scaleFactor: scaleFactor, name: currentName, text: '3'),
                                                               Container(
                                                                 width: MediaQuery.sizeOf(
                                                                             context)
@@ -2223,8 +2142,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                         .override(
                                                                           fontFamily:
                                                                               'Inter',
-                                                                          fontSize:
-                                                                              23.0,
+                                                                          fontSize: scaleFactor * 23.0,
                                                                           letterSpacing:
                                                                               0.0,
                                                                           fontWeight:
@@ -2270,8 +2188,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                         .override(
                                                                           fontFamily:
                                                                               'Inter',
-                                                                          fontSize:
-                                                                              23.0,
+                                                                          fontSize: scaleFactor * 23.0,
                                                                           letterSpacing:
                                                                               0.0,
                                                                           fontWeight:
@@ -2317,8 +2234,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                         .override(
                                                                           fontFamily:
                                                                               'Inter',
-                                                                          fontSize:
-                                                                              23.0,
+                                                                          fontSize: scaleFactor * 23.0,
                                                                           letterSpacing:
                                                                               0.0,
                                                                           fontWeight:
@@ -2363,8 +2279,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                         .override(
                                                                           fontFamily:
                                                                               'Inter',
-                                                                          fontSize:
-                                                                              23.0,
+                                                                          fontSize: scaleFactor * 23.0,
                                                                           letterSpacing:
                                                                               0.0,
                                                                           fontWeight:
@@ -2380,51 +2295,10 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                 MainAxisSize
                                                                     .max,
                                                             children: [
-                                                              Container(
-                                                                width: MediaQuery.sizeOf(
-                                                                            context)
-                                                                        .width *
-                                                                    0.05,
-                                                                height: MediaQuery.sizeOf(
-                                                                            context)
-                                                                        .height *
-                                                                    0.04,
-                                                                decoration:
-                                                                    BoxDecoration(
-                                                                  color: const Color(
-                                                                      0x3308018C),
-                                                                  border: Border
-                                                                      .all(
-                                                                    color: const Color(
-                                                                        0x80000000),
-                                                                  ),
-                                                                ),
-                                                                child: Align(
-                                                                  alignment:
-                                                                      const AlignmentDirectional(
-                                                                          0.0,
-                                                                          0.0),
-                                                                  child: Text(
-                                                                    '4',
-                                                                    style: FlutterFlowTheme.of(
-                                                                            context)
-                                                                        .bodyMedium
-                                                                        .override(
-                                                                          fontFamily:
-                                                                              'Inter',
-                                                                          fontSize:
-                                                                              25.0,
-                                                                          letterSpacing:
-                                                                              0.0,
-                                                                          fontWeight:
-                                                                              FontWeight.w600,
-                                                                        ),
-                                                                  ),
-                                                                ),
-                                                              ),
-                                                              IndexedText(),
-                                                              IndexedText(),
-                                                              IndexedText(),
+                                                              ClickableContainer(scaleFactor: scaleFactor, name: currentName, text: '4'),
+                                                              IndexedContainer(scaleFactor: scaleFactor),
+                                                              IndexedContainer(scaleFactor: scaleFactor),
+                                                              IndexedContainer(scaleFactor: scaleFactor),
                                                               Container(
                                                                 width: MediaQuery.sizeOf(
                                                                             context)
@@ -2458,8 +2332,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                         .override(
                                                                           fontFamily:
                                                                               'Inter',
-                                                                          fontSize:
-                                                                              23.0,
+                                                                          fontSize: scaleFactor * 23.0,
                                                                           letterSpacing:
                                                                               0.0,
                                                                           fontWeight:
@@ -2475,51 +2348,10 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                 MainAxisSize
                                                                     .max,
                                                             children: [
-                                                              Container(
-                                                                width: MediaQuery.sizeOf(
-                                                                            context)
-                                                                        .width *
-                                                                    0.05,
-                                                                height: MediaQuery.sizeOf(
-                                                                            context)
-                                                                        .height *
-                                                                    0.04,
-                                                                decoration:
-                                                                    BoxDecoration(
-                                                                  color: const Color(
-                                                                      0x3308018C),
-                                                                  border: Border
-                                                                      .all(
-                                                                    color: const Color(
-                                                                        0x80000000),
-                                                                  ),
-                                                                ),
-                                                                child: Align(
-                                                                  alignment:
-                                                                      const AlignmentDirectional(
-                                                                          0.0,
-                                                                          0.0),
-                                                                  child: Text(
-                                                                    '5',
-                                                                    style: FlutterFlowTheme.of(
-                                                                            context)
-                                                                        .bodyMedium
-                                                                        .override(
-                                                                          fontFamily:
-                                                                              'Inter',
-                                                                          fontSize:
-                                                                              25.0,
-                                                                          letterSpacing:
-                                                                              0.0,
-                                                                          fontWeight:
-                                                                              FontWeight.w600,
-                                                                        ),
-                                                                  ),
-                                                                ),
-                                                              ),
-                                                              IndexedText(),
-                                                              IndexedText(),
-                                                              IndexedText(),
+                                                              ClickableContainer(scaleFactor: scaleFactor, name: currentName, text: '5'),
+                                                              IndexedContainer(scaleFactor: scaleFactor),
+                                                              IndexedContainer(scaleFactor: scaleFactor),
+                                                              IndexedContainer(scaleFactor: scaleFactor),
                                                               Container(
                                                                 width: MediaQuery.sizeOf(
                                                                             context)
@@ -2553,8 +2385,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                         .override(
                                                                           fontFamily:
                                                                               'Inter',
-                                                                          fontSize:
-                                                                              23.0,
+                                                                          fontSize: scaleFactor * 23.0,
                                                                           letterSpacing:
                                                                               0.0,
                                                                           fontWeight:
@@ -2570,51 +2401,10 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                 MainAxisSize
                                                                     .max,
                                                             children: [
-                                                              Container(
-                                                                width: MediaQuery.sizeOf(
-                                                                            context)
-                                                                        .width *
-                                                                    0.05,
-                                                                height: MediaQuery.sizeOf(
-                                                                            context)
-                                                                        .height *
-                                                                    0.04,
-                                                                decoration:
-                                                                    BoxDecoration(
-                                                                  color: const Color(
-                                                                      0x3308018C),
-                                                                  border: Border
-                                                                      .all(
-                                                                    color: const Color(
-                                                                        0x80000000),
-                                                                  ),
-                                                                ),
-                                                                child: Align(
-                                                                  alignment:
-                                                                      const AlignmentDirectional(
-                                                                          0.0,
-                                                                          0.0),
-                                                                  child: Text(
-                                                                    '6',
-                                                                    style: FlutterFlowTheme.of(
-                                                                            context)
-                                                                        .bodyMedium
-                                                                        .override(
-                                                                          fontFamily:
-                                                                              'Inter',
-                                                                          fontSize:
-                                                                              25.0,
-                                                                          letterSpacing:
-                                                                              0.0,
-                                                                          fontWeight:
-                                                                              FontWeight.w600,
-                                                                        ),
-                                                                  ),
-                                                                ),
-                                                              ),
-                                                              IndexedText(),
-                                                              IndexedText(),
-                                                              IndexedText(),
+                                                              ClickableContainer(scaleFactor: scaleFactor, name: currentName, text: '6'),
+                                                              IndexedContainer(scaleFactor: scaleFactor),
+                                                              IndexedContainer(scaleFactor: scaleFactor),
+                                                              IndexedContainer(scaleFactor: scaleFactor),
                                                               Container(
                                                                 width: MediaQuery.sizeOf(
                                                                             context)
@@ -2648,8 +2438,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                         .override(
                                                                           fontFamily:
                                                                               'Inter',
-                                                                          fontSize:
-                                                                              23.0,
+                                                                          fontSize: scaleFactor * 23.0,
                                                                           letterSpacing:
                                                                               0.0,
                                                                           fontWeight:
@@ -2699,8 +2488,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                               'Inter',
                                                                           color:
                                                                               Colors.white,
-                                                                          fontSize:
-                                                                              23.0,
+                                                                          fontSize: scaleFactor * 23.0,
                                                                           letterSpacing:
                                                                               0.0,
                                                                           fontWeight:
@@ -2736,14 +2524,14 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                           0.0),
                                                                   child:
                                                                       Padding(
-                                                                    padding: const EdgeInsetsDirectional
+                                                                    padding: EdgeInsetsDirectional
                                                                         .fromSTEB(
                                                                             8.0,
-                                                                            0.0,
-                                                                            0.0,
-                                                                            0.0),
+                                                                            0.0 * scaleFactor,
+                                                                            0.0 * scaleFactor,
+                                                                            0.0 * scaleFactor),
                                                                     child: Text(
-                                                                      '수량:',
+                                                                      '수량:  ${getErrorNum(FFAppState().CurrentName)}' ,
                                                                       textAlign:
                                                                           TextAlign
                                                                               .center,
@@ -2753,8 +2541,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                           .override(
                                                                             fontFamily:
                                                                                 'Inter',
-                                                                            fontSize:
-                                                                                23.0,
+                                                                            fontSize: scaleFactor * 23.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -2791,12 +2578,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                           0.0),
                                                                   child:
                                                                       Padding(
-                                                                    padding: const EdgeInsetsDirectional
+                                                                    padding: EdgeInsetsDirectional
                                                                         .fromSTEB(
                                                                             8.0,
-                                                                            0.0,
-                                                                            0.0,
-                                                                            0.0),
+                                                                            0.0 * scaleFactor,
+                                                                            0.0 * scaleFactor,
+                                                                            0.0 * scaleFactor),
                                                                     child: Text(
                                                                       '양품 수량:',
                                                                       style: FlutterFlowTheme.of(
@@ -2805,8 +2592,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                           .override(
                                                                             fontFamily:
                                                                                 'Inter',
-                                                                            fontSize:
-                                                                                23.0,
+                                                                            fontSize: scaleFactor * 23.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -2823,7 +2609,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                     ),
                                                   ),
                                                 ),
-                                                const DownloadButton()
+                                                const DownloadButton(type: 'week')
                                               ].addToStart(
                                                   const SizedBox(width: 40.0)),
                                             ),
@@ -2862,8 +2648,8 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                         children: [
                                           Padding(
                                             padding:
-                                                const EdgeInsetsDirectional.fromSTEB(
-                                                    24.0, 0.0, 0.0, 0.0),
+                                                EdgeInsetsDirectional.fromSTEB(
+                                                    24.0, 0.0 * scaleFactor, 0.0 * scaleFactor, 0.0 * scaleFactor),
                                             child: Container(
                                               width: MediaQuery.sizeOf(context)
                                                       .width *
@@ -2882,9 +2668,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                 children: [
                                                   Padding(
                                                     padding:
-                                                        const EdgeInsetsDirectional
-                                                            .fromSTEB(4.0, 4.0,
-                                                                4.0, 4.0),
+                                                        EdgeInsetsDirectional
+                                                            .fromSTEB(4.0 * scaleFactor, 4.0 * scaleFactor,
+                                                                4.0 * scaleFactor, 4.0 * scaleFactor),
                                                     child: ClipRRect(
                                                       borderRadius:
                                                           BorderRadius.circular(
@@ -2902,9 +2688,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                   ),
                                                   Padding(
                                                     padding:
-                                                        const EdgeInsetsDirectional
-                                                            .fromSTEB(8.0, 0.0,
-                                                                0.0, 0.0),
+                                                        EdgeInsetsDirectional
+                                                            .fromSTEB(8.0 * scaleFactor, 0.0 * scaleFactor,
+                                                                0.0 * scaleFactor, 0.0 * scaleFactor),
                                                     child: Text(
                                                       '자주검사 체크시트',
                                                       textAlign:
@@ -2914,7 +2700,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                           .bodyMedium
                                                           .override(
                                                             fontFamily: 'Inter',
-                                                            fontSize: 50.0,
+                                                            fontSize: scaleFactor * 50.0,
                                                             letterSpacing: 0.0,
                                                             fontWeight:
                                                                 FontWeight.w600,
@@ -2989,8 +2775,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       'Inter',
                                                                   color: Colors
                                                                       .black,
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -3035,8 +2820,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                 .override(
                                                                   fontFamily:
                                                                       'Inter',
-                                                                  fontSize:
-                                                                      30.0,
+                                                                  fontSize: scaleFactor * 30.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -3082,8 +2866,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       'Inter',
                                                                   color: Colors
                                                                       .black,
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -3128,8 +2911,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                 .override(
                                                                   fontFamily:
                                                                       'Inter',
-                                                                  fontSize:
-                                                                      23.0,
+                                                                  fontSize: scaleFactor * 23.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -3179,8 +2961,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       'Inter',
                                                                   color: Colors
                                                                       .black,
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -3225,8 +3006,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                 .override(
                                                                   fontFamily:
                                                                       'Inter',
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -3272,8 +3052,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       'Inter',
                                                                   color: Colors
                                                                       .black,
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -3365,8 +3144,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       'Inter',
                                                                   color: Colors
                                                                       .black,
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -3399,12 +3177,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                         ),
                                                         child: Padding(
                                                           padding:
-                                                              const EdgeInsetsDirectional
+                                                              EdgeInsetsDirectional
                                                                   .fromSTEB(
                                                                       0.0,
-                                                                      0.0,
-                                                                      4.0,
-                                                                      0.0),
+                                                                      0.0 * scaleFactor,
+                                                                      4.0 * scaleFactor,
+                                                                      0.0 * scaleFactor),
                                                           child: Row(
                                                             mainAxisSize:
                                                                 MainAxisSize
@@ -3419,12 +3197,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                         0.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: const EdgeInsetsDirectional
+                                                                  padding: EdgeInsetsDirectional
                                                                       .fromSTEB(
-                                                                          4.0,
-                                                                          0.0,
-                                                                          4.0,
-                                                                          0.0),
+                                                                          4.0 * scaleFactor,
+                                                                          0.0 * scaleFactor,
+                                                                          4.0 * scaleFactor,
+                                                                          0.0 * scaleFactor),
                                                                   child:
                                                                       Container(
                                                                     width: MediaQuery.sizeOf(context)
@@ -3449,8 +3227,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                     .override(
                                                                       fontFamily:
                                                                           'Inter',
-                                                                      fontSize:
-                                                                          22.0,
+                                                                      fontSize: scaleFactor * 15.0,
                                                                       letterSpacing:
                                                                           0.0,
                                                                       fontWeight:
@@ -3464,12 +3241,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                         0.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: const EdgeInsetsDirectional
+                                                                  padding: EdgeInsetsDirectional
                                                                       .fromSTEB(
-                                                                          12.0,
-                                                                          0.0,
-                                                                          4.0,
-                                                                          0.0),
+                                                                          12.0 * scaleFactor,
+                                                                          0.0 * scaleFactor,
+                                                                          4.0 * scaleFactor,
+                                                                          0.0 * scaleFactor),
                                                                   child:
                                                                       Container(
                                                                     width: MediaQuery.sizeOf(context)
@@ -3500,8 +3277,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                     .override(
                                                                       fontFamily:
                                                                           'Inter',
-                                                                      fontSize:
-                                                                          22.0,
+                                                                      fontSize: scaleFactor * 15.0,
                                                                       letterSpacing:
                                                                           0.0,
                                                                       fontWeight:
@@ -3515,12 +3291,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                         0.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: const EdgeInsetsDirectional
+                                                                  padding: EdgeInsetsDirectional
                                                                       .fromSTEB(
-                                                                          12.0,
-                                                                          0.0,
-                                                                          4.0,
-                                                                          0.0),
+                                                                          12.0 * scaleFactor,
+                                                                          0.0 * scaleFactor,
+                                                                          4.0 * scaleFactor,
+                                                                          0.0 * scaleFactor),
                                                                   child:
                                                                       Container(
                                                                     width: MediaQuery.sizeOf(context)
@@ -3551,8 +3327,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                     .override(
                                                                       fontFamily:
                                                                           'Inter',
-                                                                      fontSize:
-                                                                          22.0,
+                                                                      fontSize: scaleFactor * 15.0,
                                                                       letterSpacing:
                                                                           0.0,
                                                                       fontWeight:
@@ -3566,12 +3341,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                         0.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: const EdgeInsetsDirectional
+                                                                  padding: EdgeInsetsDirectional
                                                                       .fromSTEB(
-                                                                          12.0,
-                                                                          0.0,
-                                                                          4.0,
-                                                                          0.0),
+                                                                          12.0 * scaleFactor,
+                                                                          0.0 * scaleFactor,
+                                                                          4.0 * scaleFactor,
+                                                                          0.0 * scaleFactor),
                                                                   child:
                                                                       Container(
                                                                     width: MediaQuery.sizeOf(context)
@@ -3602,8 +3377,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                     .override(
                                                                       fontFamily:
                                                                           'Inter',
-                                                                      fontSize:
-                                                                          22.0,
+                                                                      fontSize: scaleFactor * 15.0,
                                                                       letterSpacing:
                                                                           0.0,
                                                                       fontWeight:
@@ -3651,8 +3425,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       'Inter',
                                                                   color: Colors
                                                                       .black,
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -3695,8 +3468,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                 .override(
                                                                   fontFamily:
                                                                       'Inter',
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -3750,9 +3522,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                   ),
                                                 ),
                                                 child: Padding(
-                                                  padding: const EdgeInsetsDirectional
+                                                  padding: EdgeInsetsDirectional
                                                       .fromSTEB(
-                                                          8.0, 8.0, 8.0, 8.0),
+                                                          8.0, 8.0 * scaleFactor, 8.0 * scaleFactor, 8.0 * scaleFactor),
                                                   child: ClipRRect(
                                                     borderRadius:
                                                         BorderRadius.circular(
@@ -3771,9 +3543,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                               alignment: const AlignmentDirectional(
                                                   0.0, 0.0),
                                               child: Padding(
-                                                padding: const EdgeInsetsDirectional
+                                                padding: EdgeInsetsDirectional
                                                     .fromSTEB(
-                                                        0.0, 8.0, 0.0, 0.0),
+                                                        0.0, 8.0 * scaleFactor, 0.0 * scaleFactor, 0.0 * scaleFactor),
                                                 child: Container(
                                                   width:
                                                       MediaQuery.sizeOf(context)
@@ -3819,9 +3591,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                               alignment: const AlignmentDirectional(
                                                   0.0, 1.0),
                                               child: Padding(
-                                                padding: const EdgeInsetsDirectional
+                                                padding: EdgeInsetsDirectional
                                                     .fromSTEB(
-                                                        0.0, 8.0, 0.0, 0.0),
+                                                        0.0, 8.0 * scaleFactor, 0.0 * scaleFactor, 0.0 * scaleFactor),
                                                 child: Container(
                                                   width:
                                                       MediaQuery.sizeOf(context)
@@ -3841,9 +3613,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                   ),
                                                   child: Padding(
                                                     padding:
-                                                        const EdgeInsetsDirectional
-                                                            .fromSTEB(16.0, 4.0,
-                                                                16.0, 0.0),
+                                                        EdgeInsetsDirectional
+                                                            .fromSTEB(16.0 * scaleFactor, 4.0 * scaleFactor,
+                                                                16.0 * scaleFactor, 0.0 * scaleFactor),
                                                     child: Text(
                                                       '1. 이상 발생시 즉시 QA에 통보\n2. 자주검사 기준서 필히 숙지 할 것.\n3. 검사주기가 전수 검사인 제품은 불량내용 및 수량만 체크할 것.\n(양호 :O  불량발생:X  치수:치수기입)',
                                                       style: FlutterFlowTheme
@@ -3851,7 +3623,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                           .bodyMedium
                                                           .override(
                                                             fontFamily: 'Inter',
-                                                            fontSize: 23.0,
+                                                            fontSize: scaleFactor * 23.0,
                                                             letterSpacing: 0.0,
                                                             fontWeight:
                                                                 FontWeight.w600,
@@ -3882,9 +3654,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                 children: [
                                                   Padding(
                                                     padding:
-                                                        const EdgeInsetsDirectional
-                                                            .fromSTEB(0.0, 0.0,
-                                                                16.0, 0.0),
+                                                        EdgeInsetsDirectional
+                                                            .fromSTEB(0.0 * scaleFactor, 0.0 * scaleFactor,
+                                                                16.0 * scaleFactor, 0.0 * scaleFactor),
                                                     child: InkWell(
                                                       splashColor:
                                                           Colors.transparent,
@@ -3918,12 +3690,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                             0.0, 0.0),
                                                     child: Padding(
                                                       padding:
-                                                          const EdgeInsetsDirectional
+                                                          EdgeInsetsDirectional
                                                               .fromSTEB(
                                                                   0.0,
-                                                                  0.0,
-                                                                  16.0,
-                                                                  0.0),
+                                                                  0.0 * scaleFactor,
+                                                                  16.0 * scaleFactor,
+                                                                  0.0 * scaleFactor),
                                                       child: Text(
                                                         '날짜 : ',
                                                         textAlign:
@@ -3934,7 +3706,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                             .override(
                                                               fontFamily:
                                                                   'Inter',
-                                                              fontSize: 35.0,
+                                                              fontSize: scaleFactor * 35.0,
                                                               letterSpacing:
                                                                   0.0,
                                                               fontWeight:
@@ -3957,7 +3729,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                           .bodyMedium
                                                           .override(
                                                             fontFamily: 'Inter',
-                                                            fontSize: 35.0,
+                                                            fontSize: scaleFactor * 35.0,
                                                             letterSpacing: 0.0,
                                                             fontWeight:
                                                                 FontWeight.w600,
@@ -3966,9 +3738,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                   ),
                                                   Padding(
                                                     padding:
-                                                        const EdgeInsetsDirectional
-                                                            .fromSTEB(16.0, 0.0,
-                                                                0.0, 0.0),
+                                                        EdgeInsetsDirectional
+                                                            .fromSTEB(16.0 * scaleFactor, 0.0 * scaleFactor,
+                                                                0.0 * scaleFactor, 0.0 * scaleFactor),
                                                     child: InkWell(
                                                       splashColor:
                                                           Colors.transparent,
@@ -4008,8 +3780,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       .override(
                                                                         fontFamily:
                                                                             'Inter Tight',
-                                                                        fontSize:
-                                                                            32.0,
+                                                                        fontSize: scaleFactor * 32.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -4082,9 +3853,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                   ),
                                                   Padding(
                                                     padding:
-                                                        const EdgeInsetsDirectional
-                                                            .fromSTEB(16.0, 0.0,
-                                                                0.0, 0.0),
+                                                        EdgeInsetsDirectional
+                                                            .fromSTEB(16.0 * scaleFactor, 0.0 * scaleFactor,
+                                                                0.0 * scaleFactor, 0.0 * scaleFactor),
                                                     child: InkWell(
                                                       splashColor:
                                                           Colors.transparent,
@@ -4161,7 +3932,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                   'Inter',
                                                               color:
                                                                   Colors.white,
-                                                              fontSize: 25.0,
+                                                              fontSize: scaleFactor * 25.0,
                                                               letterSpacing:
                                                                   0.0,
                                                               fontWeight:
@@ -4201,7 +3972,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                             .override(
                                                               fontFamily:
                                                                   'Inter',
-                                                              fontSize: 25.0,
+                                                              fontSize: scaleFactor * 25.0,
                                                               letterSpacing:
                                                                   0.0,
                                                               fontWeight:
@@ -4215,8 +3986,8 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                               ),
                                             ),
                                             Padding(
-                                              padding: const EdgeInsetsDirectional
-                                                  .fromSTEB(0.0, 8.0, 0.0, 8.0),
+                                              padding: EdgeInsetsDirectional
+                                                  .fromSTEB(0.0 * scaleFactor, 8.0 * scaleFactor, 0.0 * scaleFactor, 8.0 * scaleFactor),
                                               child: Container(
                                                 width:
                                                     MediaQuery.sizeOf(context)
@@ -4235,31 +4006,37 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                   ),
                                                 ),
                                                 child: Padding(
-                                                  padding: const EdgeInsetsDirectional
+                                                  padding: EdgeInsetsDirectional
                                                       .fromSTEB(
-                                                          8.0, 8.0, 8.0, 8.0),
-                                                  child: ClipRRect(
+                                                          8.0, 8.0 * scaleFactor, 8.0 * scaleFactor, 8.0 * scaleFactor),
+
+                                                  child: InkWell(
+                                                    onTap: (){
+                                                      FFAppState().setIndex();
+                                                    },
+                                                    child:ClipRRect(
                                                     borderRadius:
                                                         BorderRadius.circular(
                                                             8.0),
                                                     child: receivedImages[_model
-                                                                .tabBarCurrentIndex] !=
+                                                                .tabBarCurrentIndex][FFAppState().index] !=
                                                             null
                                                         ? Image.memory(
                                                             receivedImages[_model
-                                                                .tabBarCurrentIndex]!,
+                                                                .tabBarCurrentIndex][FFAppState().index]!,
                                                             height: 300,
                                                             width:
                                                                 double.infinity,
                                                             fit: BoxFit
                                                                 .fitHeight,
                                                           )
-                                                        : Image.network(
-                                                            'https://picsum.photos/seed/510/60',
+                                                        : Image.asset(
+                                                           'assets/images/blank.png',
                                                             width: 200.0,
                                                             height: 200.0,
                                                             fit: BoxFit.cover,
                                                           ),
+                                                  ),
                                                   ),
                                                 ),
                                               ),
@@ -4274,9 +4051,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                   CrossAxisAlignment.end,
                                               children: [
                                                 Padding(
-                                                  padding: const EdgeInsetsDirectional
+                                                  padding: EdgeInsetsDirectional
                                                       .fromSTEB(
-                                                          2.0, 2.0, 2.0, 2.0),
+                                                          2.0, 2.0 * scaleFactor, 2.0 * scaleFactor, 2.0 * scaleFactor),
                                                   child: Container(
                                                     width: MediaQuery.sizeOf(
                                                                 context)
@@ -4339,8 +4116,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                             'Inter',
                                                                         color: Colors
                                                                             .white,
-                                                                        fontSize:
-                                                                            25.0,
+                                                                        fontSize: scaleFactor * 25.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -4385,8 +4161,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                             'Inter',
                                                                         color: Colors
                                                                             .white,
-                                                                        fontSize:
-                                                                            25.0,
+                                                                        fontSize: scaleFactor * 25.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -4431,8 +4206,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                             'Inter',
                                                                         color: Colors
                                                                             .white,
-                                                                        fontSize:
-                                                                            25.0,
+                                                                        fontSize: scaleFactor * 25.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -4477,8 +4251,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                             'Inter',
                                                                         color: Colors
                                                                             .white,
-                                                                        fontSize:
-                                                                            25.0,
+                                                                        fontSize: scaleFactor * 25.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -4524,8 +4297,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                             'Inter',
                                                                         color: Colors
                                                                             .white,
-                                                                        fontSize:
-                                                                            25.0,
+                                                                        fontSize: scaleFactor * 25.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -4540,53 +4312,10 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                           mainAxisSize:
                                                               MainAxisSize.max,
                                                           children: [
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.05,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x3308018C),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '1',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            25.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            IndexedText(),
-                                                            IndexedText(),
-                                                            IndexedText(),
+                                                            ClickableContainer(scaleFactor: scaleFactor, name: currentName, text: '1'),
+                                                            IndexedContainer(scaleFactor: scaleFactor),
+                                                            IndexedContainer(scaleFactor: scaleFactor),
+                                                            IndexedContainer(scaleFactor: scaleFactor),
                                                             Container(
                                                               width: MediaQuery
                                                                           .sizeOf(
@@ -4622,8 +4351,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       .override(
                                                                         fontFamily:
                                                                             'Inter',
-                                                                        fontSize:
-                                                                            23.0,
+                                                                        fontSize: scaleFactor * 23.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -4638,53 +4366,10 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                           mainAxisSize:
                                                               MainAxisSize.max,
                                                           children: [
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.05,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x3308018C),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '2',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            25.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            IndexedText(),
-                                                            IndexedText(),
-                                                            IndexedText(),
+                                                            ClickableContainer(scaleFactor: scaleFactor, name: currentName, text: '2'),
+                                                            IndexedContainer(scaleFactor: scaleFactor),
+                                                            IndexedContainer(scaleFactor: scaleFactor),
+                                                            IndexedContainer(scaleFactor: scaleFactor),
                                                             Container(
                                                               width: MediaQuery
                                                                           .sizeOf(
@@ -4720,8 +4405,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       .override(
                                                                         fontFamily:
                                                                             'Inter',
-                                                                        fontSize:
-                                                                            23.0,
+                                                                        fontSize: scaleFactor * 23.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -4736,50 +4420,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                           mainAxisSize:
                                                               MainAxisSize.max,
                                                           children: [
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.05,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x3308018C),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '3',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            25.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
+                                                            ClickableContainer(scaleFactor: scaleFactor, name: currentName, text: '3'),
                                                             Container(
                                                               width: MediaQuery
                                                                           .sizeOf(
@@ -4819,8 +4460,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       .override(
                                                                         fontFamily:
                                                                             'Inter',
-                                                                        fontSize:
-                                                                            23.0,
+                                                                        fontSize: scaleFactor * 23.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -4868,8 +4508,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       .override(
                                                                         fontFamily:
                                                                             'Inter',
-                                                                        fontSize:
-                                                                            23.0,
+                                                                        fontSize: scaleFactor * 23.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -4917,8 +4556,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       .override(
                                                                         fontFamily:
                                                                             'Inter',
-                                                                        fontSize:
-                                                                            23.0,
+                                                                        fontSize: scaleFactor * 23.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -4965,8 +4603,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       .override(
                                                                         fontFamily:
                                                                             'Inter',
-                                                                        fontSize:
-                                                                            23.0,
+                                                                        fontSize: scaleFactor * 23.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -4981,53 +4618,10 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                           mainAxisSize:
                                                               MainAxisSize.max,
                                                           children: [
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.05,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x3308018C),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '4',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            25.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            IndexedText(),
-                                                            IndexedText(),
-                                                            IndexedText(),
+                                                            ClickableContainer(scaleFactor: scaleFactor, name: currentName, text: '4'),
+                                                            IndexedContainer(scaleFactor: scaleFactor),
+                                                            IndexedContainer(scaleFactor: scaleFactor),
+                                                            IndexedContainer(scaleFactor: scaleFactor),
                                                             Container(
                                                               width: MediaQuery
                                                                           .sizeOf(
@@ -5063,8 +4657,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       .override(
                                                                         fontFamily:
                                                                             'Inter',
-                                                                        fontSize:
-                                                                            23.0,
+                                                                        fontSize: scaleFactor * 23.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -5079,53 +4672,10 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                           mainAxisSize:
                                                               MainAxisSize.max,
                                                           children: [
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.05,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x3308018C),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '5',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            25.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            IndexedText(),
-                                                            IndexedText(),
-                                                            IndexedText(),
+                                                            ClickableContainer(scaleFactor: scaleFactor, name: currentName, text: '5'),
+                                                            IndexedContainer(scaleFactor: scaleFactor),
+                                                            IndexedContainer(scaleFactor: scaleFactor),
+                                                            IndexedContainer(scaleFactor: scaleFactor),
                                                             Container(
                                                               width: MediaQuery
                                                                           .sizeOf(
@@ -5161,8 +4711,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       .override(
                                                                         fontFamily:
                                                                             'Inter',
-                                                                        fontSize:
-                                                                            23.0,
+                                                                        fontSize: scaleFactor * 23.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -5177,53 +4726,10 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                           mainAxisSize:
                                                               MainAxisSize.max,
                                                           children: [
-                                                            Container(
-                                                              width: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .width *
-                                                                  0.05,
-                                                              height: MediaQuery
-                                                                          .sizeOf(
-                                                                              context)
-                                                                      .height *
-                                                                  0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x3308018C),
-                                                                border:
-                                                                    Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0,
-                                                                        0.0),
-                                                                child: Text(
-                                                                  '6',
-                                                                  style: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            25.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight.w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            IndexedText(),
-                                                            IndexedText(),
-                                                            IndexedText(),
+                                                            ClickableContainer(scaleFactor: scaleFactor, name: currentName, text: '6'),
+                                                            IndexedContainer(scaleFactor: scaleFactor),
+                                                            IndexedContainer(scaleFactor: scaleFactor),
+                                                            IndexedContainer(scaleFactor: scaleFactor),
                                                             Container(
                                                               width: MediaQuery
                                                                           .sizeOf(
@@ -5259,8 +4765,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       .override(
                                                                         fontFamily:
                                                                             'Inter',
-                                                                        fontSize:
-                                                                            23.0,
+                                                                        fontSize: scaleFactor * 23.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -5311,8 +4816,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                             'Inter',
                                                                         color: Colors
                                                                             .white,
-                                                                        fontSize:
-                                                                            23.0,
+                                                                        fontSize: scaleFactor * 23.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -5349,14 +4853,14 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                         -1.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: const EdgeInsetsDirectional
+                                                                  padding: EdgeInsetsDirectional
                                                                       .fromSTEB(
-                                                                          8.0,
-                                                                          0.0,
-                                                                          0.0,
-                                                                          0.0),
+                                                                          8.0 * scaleFactor,
+                                                                          0.0 * scaleFactor,
+                                                                          0.0 * scaleFactor,
+                                                                          0.0 * scaleFactor),
                                                                   child: Text(
-                                                                    '수량:',
+                                                                    '수량:  ${getErrorNum(FFAppState().CurrentName)}',
                                                                     textAlign:
                                                                         TextAlign
                                                                             .center,
@@ -5366,8 +4870,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                         .override(
                                                                           fontFamily:
                                                                               'Inter',
-                                                                          fontSize:
-                                                                              23.0,
+                                                                          fontSize: scaleFactor * 23.0,
                                                                           letterSpacing:
                                                                               0.0,
                                                                           fontWeight:
@@ -5405,12 +4908,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                         -1.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: const EdgeInsetsDirectional
+                                                                  padding: EdgeInsetsDirectional
                                                                       .fromSTEB(
-                                                                          8.0,
-                                                                          0.0,
-                                                                          0.0,
-                                                                          0.0),
+                                                                          8.0 * scaleFactor,
+                                                                          0.0 * scaleFactor,
+                                                                          0.0 * scaleFactor,
+                                                                          0.0 * scaleFactor),
                                                                   child: Text(
                                                                     '양품 수량:',
                                                                     style: FlutterFlowTheme.of(
@@ -5419,8 +4922,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                         .override(
                                                                           fontFamily:
                                                                               'Inter',
-                                                                          fontSize:
-                                                                              23.0,
+                                                                          fontSize: scaleFactor * 23.0,
                                                                           letterSpacing:
                                                                               0.0,
                                                                           fontWeight:
@@ -5436,7 +4938,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                     ),
                                                   ),
                                                 ),
-                                                const DownloadButton()
+                                                const DownloadButton(type: 'week')
                                               ].addToStart(
                                                   const SizedBox(width: 40.0)),
                                             ),
@@ -5476,8 +4978,8 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                         children: [
                                           Padding(
                                             padding:
-                                                const EdgeInsetsDirectional.fromSTEB(
-                                                    24.0, 0.0, 0.0, 0.0),
+                                                EdgeInsetsDirectional.fromSTEB(
+                                                    24.0, 0.0 * scaleFactor, 0.0 * scaleFactor, 0.0 * scaleFactor),
                                             child: Container(
                                               width: MediaQuery.sizeOf(context)
                                                       .width *
@@ -5496,9 +4998,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                 children: [
                                                   Padding(
                                                     padding:
-                                                        const EdgeInsetsDirectional
-                                                            .fromSTEB(4.0, 4.0,
-                                                                4.0, 4.0),
+                                                        EdgeInsetsDirectional
+                                                            .fromSTEB(4.0 * scaleFactor, 4.0 * scaleFactor,
+                                                                4.0 * scaleFactor, 4.0 * scaleFactor),
                                                     child: ClipRRect(
                                                       borderRadius:
                                                           BorderRadius.circular(
@@ -5516,9 +5018,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                   ),
                                                   Padding(
                                                     padding:
-                                                        const EdgeInsetsDirectional
-                                                            .fromSTEB(8.0, 0.0,
-                                                                0.0, 0.0),
+                                                        EdgeInsetsDirectional
+                                                            .fromSTEB(8.0 * scaleFactor, 0.0 * scaleFactor,
+                                                                0.0 * scaleFactor, 0.0 * scaleFactor),
                                                     child: Text(
                                                       '자주검사 체크시트',
                                                       textAlign:
@@ -5528,7 +5030,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                           .bodyMedium
                                                           .override(
                                                             fontFamily: 'Inter',
-                                                            fontSize: 50.0,
+                                                            fontSize: scaleFactor * 50.0,
                                                             letterSpacing: 0.0,
                                                             fontWeight:
                                                                 FontWeight.w600,
@@ -5603,8 +5105,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       'Inter',
                                                                   color: Colors
                                                                       .black,
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -5649,8 +5150,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                 .override(
                                                                   fontFamily:
                                                                       'Inter',
-                                                                  fontSize:
-                                                                      30.0,
+                                                                  fontSize: scaleFactor * 30.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -5696,8 +5196,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       'Inter',
                                                                   color: Colors
                                                                       .black,
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -5742,8 +5241,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                 .override(
                                                                   fontFamily:
                                                                       'Inter',
-                                                                  fontSize:
-                                                                      23.0,
+                                                                  fontSize: scaleFactor * 23.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -5793,8 +5291,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       'Inter',
                                                                   color: Colors
                                                                       .black,
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -5839,8 +5336,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                 .override(
                                                                   fontFamily:
                                                                       'Inter',
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -5886,8 +5382,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       'Inter',
                                                                   color: Colors
                                                                       .black,
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -5979,8 +5474,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       'Inter',
                                                                   color: Colors
                                                                       .black,
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -6013,12 +5507,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                         ),
                                                         child: Padding(
                                                           padding:
-                                                              const EdgeInsetsDirectional
+                                                              EdgeInsetsDirectional
                                                                   .fromSTEB(
                                                                       0.0,
-                                                                      0.0,
-                                                                      4.0,
-                                                                      0.0),
+                                                                      0.0 * scaleFactor,
+                                                                      4.0 * scaleFactor,
+                                                                      0.0 * scaleFactor),
                                                           child: Row(
                                                             mainAxisSize:
                                                                 MainAxisSize
@@ -6033,12 +5527,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                         0.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: const EdgeInsetsDirectional
+                                                                  padding: EdgeInsetsDirectional
                                                                       .fromSTEB(
-                                                                          4.0,
-                                                                          0.0,
-                                                                          4.0,
-                                                                          0.0),
+                                                                          4.0 * scaleFactor,
+                                                                          0.0 * scaleFactor,
+                                                                          4.0 * scaleFactor,
+                                                                          0.0 * scaleFactor),
                                                                   child:
                                                                       Container(
                                                                     width: MediaQuery.sizeOf(context)
@@ -6063,8 +5557,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                     .override(
                                                                       fontFamily:
                                                                           'Inter',
-                                                                      fontSize:
-                                                                          22.0,
+                                                                      fontSize: scaleFactor * 15.0,
                                                                       letterSpacing:
                                                                           0.0,
                                                                       fontWeight:
@@ -6078,12 +5571,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                         0.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: const EdgeInsetsDirectional
+                                                                  padding: EdgeInsetsDirectional
                                                                       .fromSTEB(
-                                                                          12.0,
-                                                                          0.0,
-                                                                          4.0,
-                                                                          0.0),
+                                                                          12.0 * scaleFactor,
+                                                                          0.0 * scaleFactor,
+                                                                          4.0 * scaleFactor,
+                                                                          0.0 * scaleFactor),
                                                                   child:
                                                                       Container(
                                                                     width: MediaQuery.sizeOf(context)
@@ -6114,8 +5607,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                     .override(
                                                                       fontFamily:
                                                                           'Inter',
-                                                                      fontSize:
-                                                                          22.0,
+                                                                      fontSize: scaleFactor * 15.0,
                                                                       letterSpacing:
                                                                           0.0,
                                                                       fontWeight:
@@ -6129,12 +5621,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                         0.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: const EdgeInsetsDirectional
+                                                                  padding: EdgeInsetsDirectional
                                                                       .fromSTEB(
-                                                                          12.0,
-                                                                          0.0,
-                                                                          4.0,
-                                                                          0.0),
+                                                                          12.0 * scaleFactor,
+                                                                          0.0 * scaleFactor,
+                                                                          4.0 * scaleFactor,
+                                                                          0.0 * scaleFactor),
                                                                   child:
                                                                       Container(
                                                                     width: MediaQuery.sizeOf(context)
@@ -6165,8 +5657,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                     .override(
                                                                       fontFamily:
                                                                           'Inter',
-                                                                      fontSize:
-                                                                          22.0,
+                                                                      fontSize: scaleFactor * 15.0,
                                                                       letterSpacing:
                                                                           0.0,
                                                                       fontWeight:
@@ -6180,12 +5671,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                         0.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: const EdgeInsetsDirectional
+                                                                  padding: EdgeInsetsDirectional
                                                                       .fromSTEB(
-                                                                          12.0,
-                                                                          0.0,
-                                                                          4.0,
-                                                                          0.0),
+                                                                          12.0 * scaleFactor,
+                                                                          0.0 * scaleFactor,
+                                                                          4.0 * scaleFactor,
+                                                                          0.0 * scaleFactor),
                                                                   child:
                                                                       Container(
                                                                     width: MediaQuery.sizeOf(context)
@@ -6216,8 +5707,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                     .override(
                                                                       fontFamily:
                                                                           'Inter',
-                                                                      fontSize:
-                                                                          22.0,
+                                                                      fontSize: scaleFactor * 15.0,
                                                                       letterSpacing:
                                                                           0.0,
                                                                       fontWeight:
@@ -6265,8 +5755,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       'Inter',
                                                                   color: Colors
                                                                       .black,
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -6309,8 +5798,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                 .override(
                                                                   fontFamily:
                                                                       'Inter',
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -6364,9 +5852,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                   ),
                                                 ),
                                                 child: Padding(
-                                                  padding: const EdgeInsetsDirectional
+                                                  padding: EdgeInsetsDirectional
                                                       .fromSTEB(
-                                                          8.0, 8.0, 8.0, 8.0),
+                                                          8.0, 8.0 * scaleFactor, 8.0 * scaleFactor, 8.0 * scaleFactor),
                                                   child: ClipRRect(
                                                     borderRadius:
                                                         BorderRadius.circular(
@@ -6385,9 +5873,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                               alignment: const AlignmentDirectional(
                                                   0.0, 0.0),
                                               child: Padding(
-                                                padding: const EdgeInsetsDirectional
+                                                padding: EdgeInsetsDirectional
                                                     .fromSTEB(
-                                                        0.0, 8.0, 0.0, 0.0),
+                                                        0.0, 8.0 * scaleFactor, 0.0 * scaleFactor, 0.0 * scaleFactor),
                                                 child: Container(
                                                   width:
                                                       MediaQuery.sizeOf(context)
@@ -6433,9 +5921,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                               alignment: const AlignmentDirectional(
                                                   0.0, 1.0),
                                               child: Padding(
-                                                padding: const EdgeInsetsDirectional
+                                                padding: EdgeInsetsDirectional
                                                     .fromSTEB(
-                                                        0.0, 8.0, 0.0, 0.0),
+                                                        0.0, 8.0 * scaleFactor, 0.0 * scaleFactor, 0.0 * scaleFactor),
                                                 child: Container(
                                                   width:
                                                       MediaQuery.sizeOf(context)
@@ -6455,9 +5943,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                   ),
                                                   child: Padding(
                                                     padding:
-                                                        const EdgeInsetsDirectional
-                                                            .fromSTEB(16.0, 4.0,
-                                                                16.0, 0.0),
+                                                        EdgeInsetsDirectional
+                                                            .fromSTEB(16.0 * scaleFactor, 4.0 * scaleFactor,
+                                                                16.0 * scaleFactor, 0.0 * scaleFactor),
                                                     child: Text(
                                                       '1. 이상 발생시 즉시 QA에 통보\n2. 자주검사 기준서 필히 숙지 할 것.\n3. 검사주기가 전수 검사인 제품은 불량내용 및 수량만 체크할 것.\n(양호 :O  불량발생:X  치수:치수기입)',
                                                       style: FlutterFlowTheme
@@ -6465,7 +5953,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                           .bodyMedium
                                                           .override(
                                                             fontFamily: 'Inter',
-                                                            fontSize: 23.0,
+                                                            fontSize: scaleFactor * 23.0,
                                                             letterSpacing: 0.0,
                                                             fontWeight:
                                                                 FontWeight.w600,
@@ -6496,9 +5984,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                 children: [
                                                   Padding(
                                                     padding:
-                                                        const EdgeInsetsDirectional
-                                                            .fromSTEB(0.0, 0.0,
-                                                                16.0, 0.0),
+                                                        EdgeInsetsDirectional
+                                                            .fromSTEB(0.0 * scaleFactor, 0.0 * scaleFactor,
+                                                                16.0 * scaleFactor, 0.0 * scaleFactor),
                                                     child: InkWell(
                                                       splashColor:
                                                           Colors.transparent,
@@ -6532,12 +6020,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                             0.0, 0.0),
                                                     child: Padding(
                                                       padding:
-                                                          const EdgeInsetsDirectional
+                                                          EdgeInsetsDirectional
                                                               .fromSTEB(
                                                                   0.0,
-                                                                  0.0,
-                                                                  16.0,
-                                                                  0.0),
+                                                                  0.0 * scaleFactor,
+                                                                  16.0 * scaleFactor,
+                                                                  0.0 * scaleFactor),
                                                       child: Text(
                                                         '날짜 : ',
                                                         textAlign:
@@ -6548,7 +6036,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                             .override(
                                                               fontFamily:
                                                                   'Inter',
-                                                              fontSize: 35.0,
+                                                              fontSize: scaleFactor * 35.0,
                                                               letterSpacing:
                                                                   0.0,
                                                               fontWeight:
@@ -6571,7 +6059,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                           .bodyMedium
                                                           .override(
                                                             fontFamily: 'Inter',
-                                                            fontSize: 35.0,
+                                                            fontSize: scaleFactor * 35.0,
                                                             letterSpacing: 0.0,
                                                             fontWeight:
                                                                 FontWeight.w600,
@@ -6580,9 +6068,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                   ),
                                                   Padding(
                                                     padding:
-                                                        const EdgeInsetsDirectional
-                                                            .fromSTEB(16.0, 0.0,
-                                                                0.0, 0.0),
+                                                        EdgeInsetsDirectional
+                                                            .fromSTEB(16.0 * scaleFactor, 0.0 * scaleFactor,
+                                                                0.0 * scaleFactor, 0.0 * scaleFactor),
                                                     child: InkWell(
                                                       splashColor:
                                                           Colors.transparent,
@@ -6622,8 +6110,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       .override(
                                                                         fontFamily:
                                                                             'Inter Tight',
-                                                                        fontSize:
-                                                                            32.0,
+                                                                        fontSize: scaleFactor * 32.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -6696,9 +6183,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                   ),
                                                   Padding(
                                                     padding:
-                                                        const EdgeInsetsDirectional
-                                                            .fromSTEB(16.0, 0.0,
-                                                                0.0, 0.0),
+                                                        EdgeInsetsDirectional
+                                                            .fromSTEB(16.0 * scaleFactor, 0.0 * scaleFactor,
+                                                                0.0 * scaleFactor, 0.0 * scaleFactor),
                                                     child: InkWell(
                                                       splashColor:
                                                           Colors.transparent,
@@ -6775,7 +6262,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                   'Inter',
                                                               color:
                                                                   Colors.white,
-                                                              fontSize: 25.0,
+                                                              fontSize: scaleFactor * 25.0,
                                                               letterSpacing:
                                                                   0.0,
                                                               fontWeight:
@@ -6815,7 +6302,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                             .override(
                                                               fontFamily:
                                                                   'Inter',
-                                                              fontSize: 25.0,
+                                                              fontSize: scaleFactor * 25.0,
                                                               letterSpacing:
                                                                   0.0,
                                                               fontWeight:
@@ -6829,8 +6316,8 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                               ),
                                             ),
                                             Padding(
-                                              padding: const EdgeInsetsDirectional
-                                                  .fromSTEB(0.0, 8.0, 0.0, 8.0),
+                                              padding: EdgeInsetsDirectional
+                                                  .fromSTEB(0.0 * scaleFactor, 8.0 * scaleFactor, 0.0 * scaleFactor, 8.0 * scaleFactor),
                                               child: Container(
                                                 width:
                                                     MediaQuery.sizeOf(context)
@@ -6849,31 +6336,36 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                   ),
                                                 ),
                                                 child: Padding(
-                                                  padding: const EdgeInsetsDirectional
+                                                  padding: EdgeInsetsDirectional
                                                       .fromSTEB(
-                                                          8.0, 8.0, 8.0, 8.0),
-                                                  child: ClipRRect(
+                                                          8.0, 8.0 * scaleFactor, 8.0 * scaleFactor, 8.0 * scaleFactor),
+                                                  child: InkWell(
+                                                    onTap:() {
+                                                      FFAppState().setIndex();
+                                                    },
+                                                    child:ClipRRect(
                                                     borderRadius:
                                                         BorderRadius.circular(
                                                             8.0),
                                                     child: receivedImages[_model
-                                                                .tabBarCurrentIndex] !=
+                                                                .tabBarCurrentIndex][FFAppState().index] !=
                                                             null
                                                         ? Image.memory(
                                                             receivedImages[_model
-                                                                .tabBarCurrentIndex]!,
+                                                                .tabBarCurrentIndex][FFAppState().index]!,
                                                             height: 300,
                                                             width:
                                                                 double.infinity,
                                                             fit: BoxFit
                                                                 .fitHeight,
                                                           )
-                                                        : Image.network(
-                                                            'https://picsum.photos/seed/510/60',
+                                                        : Image.asset(
+                                                            'assets/images/blank.png',
                                                             width: 200.0,
                                                             height: 200.0,
                                                             fit: BoxFit.cover,
                                                           ),
+                                                    )
                                                   ),
                                                 ),
                                               ),
@@ -6888,8 +6380,8 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                   CrossAxisAlignment.end,
                                               children: [    
                                                 Padding(
-                                                  padding: const EdgeInsetsDirectional
-                                                      .fromSTEB(2.0, 2.0, 2.0, 2.0),
+                                                  padding: EdgeInsetsDirectional
+                                                      .fromSTEB(2.0 * scaleFactor, 2.0 * scaleFactor, 2.0 * scaleFactor, 2.0 * scaleFactor),
                                                   child: Container(
                                                     width:
                                                         MediaQuery.sizeOf(context)
@@ -6950,8 +6442,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                             'Inter',
                                                                         color: Colors
                                                                             .white,
-                                                                        fontSize:
-                                                                            25.0,
+                                                                        fontSize: scaleFactor * 25.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -6995,8 +6486,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                             'Inter',
                                                                         color: Colors
                                                                             .white,
-                                                                        fontSize:
-                                                                            25.0,
+                                                                        fontSize: scaleFactor * 25.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -7040,8 +6530,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                             'Inter',
                                                                         color: Colors
                                                                             .white,
-                                                                        fontSize:
-                                                                            25.0,
+                                                                        fontSize: scaleFactor * 25.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -7085,8 +6574,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                             'Inter',
                                                                         color: Colors
                                                                             .white,
-                                                                        fontSize:
-                                                                            25.0,
+                                                                        fontSize: scaleFactor * 25.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -7131,8 +6619,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                             'Inter',
                                                                         color: Colors
                                                                             .white,
-                                                                        fontSize:
-                                                                            25.0,
+                                                                        fontSize: scaleFactor * 25.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -7148,52 +6635,10 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                           mainAxisSize:
                                                               MainAxisSize.max,
                                                           children: [
-                                                            Container(
-                                                              width:
-                                                                  MediaQuery.sizeOf(
-                                                                              context)
-                                                                          .width *
-                                                                      0.05,
-                                                              height:
-                                                                  MediaQuery.sizeOf(
-                                                                              context)
-                                                                          .height *
-                                                                      0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x3308018C),
-                                                                border: Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0, 0.0),
-                                                                child: Text(
-                                                                  '1',
-                                                                  style: FlutterFlowTheme
-                                                                          .of(context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            25.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight
-                                                                                .w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            IndexedText(),
-                                                            IndexedText(),
-                                                            IndexedText(),
+                                                            ClickableContainer(scaleFactor: scaleFactor, name: currentName, text: '1'),
+                                                            IndexedContainer(scaleFactor: scaleFactor),
+                                                            IndexedContainer(scaleFactor: scaleFactor),
+                                                            IndexedContainer(scaleFactor: scaleFactor),
                                                             Container(
                                                               width:
                                                                   MediaQuery.sizeOf(
@@ -7227,8 +6672,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       .override(
                                                                         fontFamily:
                                                                             'Inter',
-                                                                        fontSize:
-                                                                            23.0,
+                                                                        fontSize: scaleFactor * 23.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -7244,52 +6688,10 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                           mainAxisSize:
                                                               MainAxisSize.max,
                                                           children: [
-                                                            Container(
-                                                              width:
-                                                                  MediaQuery.sizeOf(
-                                                                              context)
-                                                                          .width *
-                                                                      0.05,
-                                                              height:
-                                                                  MediaQuery.sizeOf(
-                                                                              context)
-                                                                          .height *
-                                                                      0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x3308018C),
-                                                                border: Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0, 0.0),
-                                                                child: Text(
-                                                                  '2',
-                                                                  style: FlutterFlowTheme
-                                                                          .of(context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            25.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight
-                                                                                .w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            IndexedText(),
-                                                            IndexedText(),
-                                                            IndexedText(),
+                                                            ClickableContainer(scaleFactor: scaleFactor, name: currentName, text: '2'),
+                                                            IndexedContainer(scaleFactor: scaleFactor),
+                                                            IndexedContainer(scaleFactor: scaleFactor),
+                                                            IndexedContainer(scaleFactor: scaleFactor),
                                                             Container(
                                                               width:
                                                                   MediaQuery.sizeOf(
@@ -7323,8 +6725,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       .override(
                                                                         fontFamily:
                                                                             'Inter',
-                                                                        fontSize:
-                                                                            23.0,
+                                                                        fontSize: scaleFactor * 23.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -7340,49 +6741,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                           mainAxisSize:
                                                               MainAxisSize.max,
                                                           children: [
-                                                            Container(
-                                                              width:
-                                                                  MediaQuery.sizeOf(
-                                                                              context)
-                                                                          .width *
-                                                                      0.05,
-                                                              height:
-                                                                  MediaQuery.sizeOf(
-                                                                              context)
-                                                                          .height *
-                                                                      0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x3308018C),
-                                                                border: Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0, 0.0),
-                                                                child: Text(
-                                                                  '3',
-                                                                  style: FlutterFlowTheme
-                                                                          .of(context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            25.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight
-                                                                                .w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
+                                                            ClickableContainer(scaleFactor: scaleFactor, name: currentName, text: '3'),
                                                             Container(
                                                               width:
                                                                   MediaQuery.sizeOf(
@@ -7420,8 +6779,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       .override(
                                                                         fontFamily:
                                                                             'Inter',
-                                                                        fontSize:
-                                                                            23.0,
+                                                                        fontSize: scaleFactor * 23.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -7468,8 +6826,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       .override(
                                                                         fontFamily:
                                                                             'Inter',
-                                                                        fontSize:
-                                                                            23.0,
+                                                                        fontSize: scaleFactor * 23.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -7516,8 +6873,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       .override(
                                                                         fontFamily:
                                                                             'Inter',
-                                                                        fontSize:
-                                                                            23.0,
+                                                                        fontSize: scaleFactor * 23.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -7563,8 +6919,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       .override(
                                                                         fontFamily:
                                                                             'Inter',
-                                                                        fontSize:
-                                                                            23.0,
+                                                                        fontSize: scaleFactor * 23.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -7580,49 +6935,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                           mainAxisSize:
                                                               MainAxisSize.max,
                                                           children: [
-                                                            Container(
-                                                              width:
-                                                                  MediaQuery.sizeOf(
-                                                                              context)
-                                                                          .width *
-                                                                      0.05,
-                                                              height:
-                                                                  MediaQuery.sizeOf(
-                                                                              context)
-                                                                          .height *
-                                                                      0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x3308018C),
-                                                                border: Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0, 0.0),
-                                                                child: Text(
-                                                                  '4',
-                                                                  style: FlutterFlowTheme
-                                                                          .of(context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            25.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight
-                                                                                .w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
+                                                            ClickableContainer(scaleFactor: scaleFactor, name: currentName, text: '4'),
                                                             Container(
                                                               width:
                                                                   MediaQuery.sizeOf(
@@ -7660,8 +6973,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       .override(
                                                                         fontFamily:
                                                                             'Inter',
-                                                                        fontSize:
-                                                                            23.0,
+                                                                        fontSize: scaleFactor * 23.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -7708,8 +7020,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       .override(
                                                                         fontFamily:
                                                                             'Inter',
-                                                                        fontSize:
-                                                                            23.0,
+                                                                        fontSize: scaleFactor * 23.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -7756,8 +7067,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       .override(
                                                                         fontFamily:
                                                                             'Inter',
-                                                                        fontSize:
-                                                                            23.0,
+                                                                        fontSize: scaleFactor * 23.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -7803,8 +7113,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       .override(
                                                                         fontFamily:
                                                                             'Inter',
-                                                                        fontSize:
-                                                                            23.0,
+                                                                        fontSize: scaleFactor * 23.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -7820,52 +7129,10 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                           mainAxisSize:
                                                               MainAxisSize.max,
                                                           children: [
-                                                            Container(
-                                                              width:
-                                                                  MediaQuery.sizeOf(
-                                                                              context)
-                                                                          .width *
-                                                                      0.05,
-                                                              height:
-                                                                  MediaQuery.sizeOf(
-                                                                              context)
-                                                                          .height *
-                                                                      0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x3308018C),
-                                                                border: Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0, 0.0),
-                                                                child: Text(
-                                                                  '5',
-                                                                  style: FlutterFlowTheme
-                                                                          .of(context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            25.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight
-                                                                                .w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            IndexedText(),
-                                                            IndexedText(),
-                                                            IndexedText(),
+                                                            ClickableContainer(scaleFactor: scaleFactor, name: currentName, text: '5'),
+                                                            IndexedContainer(scaleFactor: scaleFactor),
+                                                            IndexedContainer(scaleFactor: scaleFactor),
+                                                            IndexedContainer(scaleFactor: scaleFactor),
                                                             Container(
                                                               width:
                                                                   MediaQuery.sizeOf(
@@ -7899,8 +7166,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       .override(
                                                                         fontFamily:
                                                                             'Inter',
-                                                                        fontSize:
-                                                                            23.0,
+                                                                        fontSize: scaleFactor * 23.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -7916,52 +7182,10 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                           mainAxisSize:
                                                               MainAxisSize.max,
                                                           children: [
-                                                            Container(
-                                                              width:
-                                                                  MediaQuery.sizeOf(
-                                                                              context)
-                                                                          .width *
-                                                                      0.05,
-                                                              height:
-                                                                  MediaQuery.sizeOf(
-                                                                              context)
-                                                                          .height *
-                                                                      0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x3308018C),
-                                                                border: Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0, 0.0),
-                                                                child: Text(
-                                                                  '6',
-                                                                  style: FlutterFlowTheme
-                                                                          .of(context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            25.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight
-                                                                                .w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            IndexedText(),
-                                                            IndexedText(),
-                                                            IndexedText(),
+                                                            ClickableContainer(scaleFactor: scaleFactor, name: currentName, text: '6'),
+                                                            IndexedContainer(scaleFactor: scaleFactor),
+                                                            IndexedContainer(scaleFactor: scaleFactor),
+                                                            IndexedContainer(scaleFactor: scaleFactor),
                                                             Container(
                                                               width:
                                                                   MediaQuery.sizeOf(
@@ -7995,8 +7219,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       .override(
                                                                         fontFamily:
                                                                             'Inter',
-                                                                        fontSize:
-                                                                            23.0,
+                                                                        fontSize: scaleFactor * 23.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -8046,8 +7269,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                             'Inter',
                                                                         color: Colors
                                                                             .white,
-                                                                        fontSize:
-                                                                            23.0,
+                                                                        fontSize: scaleFactor * 23.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -8084,14 +7306,14 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                         -1.0, 0.0),
                                                                 child: Padding(
                                                                   padding:
-                                                                      const EdgeInsetsDirectional
+                                                                      EdgeInsetsDirectional
                                                                           .fromSTEB(
                                                                               8.0,
-                                                                              0.0,
-                                                                              0.0,
-                                                                              0.0),
+                                                                              0.0 * scaleFactor,
+                                                                              0.0 * scaleFactor,
+                                                                              0.0 * scaleFactor),
                                                                   child: Text(
-                                                                    '수량:',
+                                                                    '수량:  ${getErrorNum(FFAppState().CurrentName)}',
                                                                     textAlign:
                                                                         TextAlign
                                                                             .center,
@@ -8101,8 +7323,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                         .override(
                                                                           fontFamily:
                                                                               'Inter',
-                                                                          fontSize:
-                                                                              23.0,
+                                                                          fontSize: scaleFactor * 23.0,
                                                                           letterSpacing:
                                                                               0.0,
                                                                           fontWeight:
@@ -8140,12 +7361,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                         -1.0, 0.0),
                                                                 child: Padding(
                                                                   padding:
-                                                                      const EdgeInsetsDirectional
+                                                                      EdgeInsetsDirectional
                                                                           .fromSTEB(
                                                                               8.0,
-                                                                              0.0,
-                                                                              0.0,
-                                                                              0.0),
+                                                                              0.0 * scaleFactor,
+                                                                              0.0 * scaleFactor,
+                                                                              0.0 * scaleFactor),
                                                                   child: Text(
                                                                     '양품 수량:',
                                                                     style: FlutterFlowTheme.of(
@@ -8154,8 +7375,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                         .override(
                                                                           fontFamily:
                                                                               'Inter',
-                                                                          fontSize:
-                                                                              23.0,
+                                                                          fontSize: scaleFactor * 23.0,
                                                                           letterSpacing:
                                                                               0.0,
                                                                           fontWeight:
@@ -8172,7 +7392,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                       ),
                                                     ),
                                                   ),
-                                                const DownloadButton()
+                                                const DownloadButton(type: 'week')
                                               ].addToStart(
                                                   const SizedBox(width: 40.0)),
                                             ),
@@ -8211,8 +7431,8 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                         children: [
                                           Padding(
                                             padding:
-                                                const EdgeInsetsDirectional.fromSTEB(
-                                                    24.0, 0.0, 0.0, 0.0),
+                                                EdgeInsetsDirectional.fromSTEB(
+                                                    24.0, 0.0 * scaleFactor, 0.0 * scaleFactor, 0.0 * scaleFactor),
                                             child: Container(
                                               width: MediaQuery.sizeOf(context)
                                                       .width *
@@ -8231,9 +7451,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                 children: [
                                                   Padding(
                                                     padding:
-                                                        const EdgeInsetsDirectional
-                                                            .fromSTEB(4.0, 4.0,
-                                                                4.0, 4.0),
+                                                        EdgeInsetsDirectional
+                                                            .fromSTEB(4.0 * scaleFactor, 4.0 * scaleFactor,
+                                                                4.0 * scaleFactor, 4.0 * scaleFactor),
                                                     child: ClipRRect(
                                                       borderRadius:
                                                           BorderRadius.circular(
@@ -8251,9 +7471,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                   ),
                                                   Padding(
                                                     padding:
-                                                        const EdgeInsetsDirectional
-                                                            .fromSTEB(8.0, 0.0,
-                                                                0.0, 0.0),
+                                                        EdgeInsetsDirectional
+                                                            .fromSTEB(8.0 * scaleFactor, 0.0 * scaleFactor,
+                                                                0.0 * scaleFactor, 0.0 * scaleFactor),
                                                     child: Text(
                                                       '자주검사 체크시트',
                                                       textAlign:
@@ -8263,7 +7483,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                           .bodyMedium
                                                           .override(
                                                             fontFamily: 'Inter',
-                                                            fontSize: 50.0,
+                                                            fontSize: scaleFactor * 50.0,
                                                             letterSpacing: 0.0,
                                                             fontWeight:
                                                                 FontWeight.w600,
@@ -8338,8 +7558,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       'Inter',
                                                                   color: Colors
                                                                       .black,
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -8384,8 +7603,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                 .override(
                                                                   fontFamily:
                                                                       'Inter',
-                                                                  fontSize:
-                                                                      30.0,
+                                                                  fontSize: scaleFactor * 30.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -8431,8 +7649,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       'Inter',
                                                                   color: Colors
                                                                       .black,
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -8477,8 +7694,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                 .override(
                                                                   fontFamily:
                                                                       'Inter',
-                                                                  fontSize:
-                                                                      23.0,
+                                                                  fontSize: scaleFactor * 23.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -8528,8 +7744,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       'Inter',
                                                                   color: Colors
                                                                       .black,
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -8574,8 +7789,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                 .override(
                                                                   fontFamily:
                                                                       'Inter',
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -8621,8 +7835,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       'Inter',
                                                                   color: Colors
                                                                       .black,
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -8714,8 +7927,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       'Inter',
                                                                   color: Colors
                                                                       .black,
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -8748,12 +7960,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                         ),
                                                         child: Padding(
                                                           padding:
-                                                              const EdgeInsetsDirectional
+                                                              EdgeInsetsDirectional
                                                                   .fromSTEB(
                                                                       0.0,
-                                                                      0.0,
-                                                                      4.0,
-                                                                      0.0),
+                                                                      0.0 * scaleFactor,
+                                                                      4.0 * scaleFactor,
+                                                                      0.0 * scaleFactor),
                                                           child: Row(
                                                             mainAxisSize:
                                                                 MainAxisSize
@@ -8768,12 +7980,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                         0.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: const EdgeInsetsDirectional
+                                                                  padding: EdgeInsetsDirectional
                                                                       .fromSTEB(
                                                                           4.0,
-                                                                          0.0,
-                                                                          4.0,
-                                                                          0.0),
+                                                                          0.0 * scaleFactor,
+                                                                          4.0 * scaleFactor,
+                                                                          0.0 * scaleFactor),
                                                                   child:
                                                                       Container(
                                                                     width: MediaQuery.sizeOf(context)
@@ -8798,8 +8010,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                     .override(
                                                                       fontFamily:
                                                                           'Inter',
-                                                                      fontSize:
-                                                                          22.0,
+                                                                      fontSize: scaleFactor * 15.0,
                                                                       letterSpacing:
                                                                           0.0,
                                                                       fontWeight:
@@ -8813,12 +8024,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                         0.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: const EdgeInsetsDirectional
+                                                                  padding: EdgeInsetsDirectional
                                                                       .fromSTEB(
-                                                                          12.0,
-                                                                          0.0,
-                                                                          4.0,
-                                                                          0.0),
+                                                                          12.0 * scaleFactor,
+                                                                          0.0 * scaleFactor,
+                                                                          4.0 * scaleFactor,
+                                                                          0.0 * scaleFactor),
                                                                   child:
                                                                       Container(
                                                                     width: MediaQuery.sizeOf(context)
@@ -8849,8 +8060,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                     .override(
                                                                       fontFamily:
                                                                           'Inter',
-                                                                      fontSize:
-                                                                          22.0,
+                                                                      fontSize: scaleFactor * 15.0,
                                                                       letterSpacing:
                                                                           0.0,
                                                                       fontWeight:
@@ -8864,12 +8074,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                         0.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: const EdgeInsetsDirectional
+                                                                  padding: EdgeInsetsDirectional
                                                                       .fromSTEB(
-                                                                          12.0,
-                                                                          0.0,
-                                                                          4.0,
-                                                                          0.0),
+                                                                          12.0 * scaleFactor,
+                                                                          0.0 * scaleFactor,
+                                                                          4.0 * scaleFactor,
+                                                                          0.0 * scaleFactor),
                                                                   child:
                                                                       Container(
                                                                     width: MediaQuery.sizeOf(context)
@@ -8900,8 +8110,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                     .override(
                                                                       fontFamily:
                                                                           'Inter',
-                                                                      fontSize:
-                                                                          22.0,
+                                                                      fontSize: scaleFactor * 15.0,
                                                                       letterSpacing:
                                                                           0.0,
                                                                       fontWeight:
@@ -8915,12 +8124,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                         0.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: const EdgeInsetsDirectional
+                                                                  padding: EdgeInsetsDirectional
                                                                       .fromSTEB(
-                                                                          12.0,
-                                                                          0.0,
-                                                                          4.0,
-                                                                          0.0),
+                                                                          12.0 * scaleFactor,
+                                                                          0.0 * scaleFactor,
+                                                                          4.0 * scaleFactor,
+                                                                          0.0 * scaleFactor),
                                                                   child:
                                                                       Container(
                                                                     width: MediaQuery.sizeOf(context)
@@ -8951,8 +8160,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                     .override(
                                                                       fontFamily:
                                                                           'Inter',
-                                                                      fontSize:
-                                                                          22.0,
+                                                                      fontSize: scaleFactor * 15.0,
                                                                       letterSpacing:
                                                                           0.0,
                                                                       fontWeight:
@@ -9000,8 +8208,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       'Inter',
                                                                   color: Colors
                                                                       .black,
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -9044,8 +8251,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                 .override(
                                                                   fontFamily:
                                                                       'Inter',
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -9099,9 +8305,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                   ),
                                                 ),
                                                 child: Padding(
-                                                  padding: const EdgeInsetsDirectional
+                                                  padding: EdgeInsetsDirectional
                                                       .fromSTEB(
-                                                          8.0, 8.0, 8.0, 8.0),
+                                                          8.0, 8.0 * scaleFactor, 8.0 * scaleFactor, 8.0 * scaleFactor),
                                                   child: ClipRRect(
                                                     borderRadius:
                                                         BorderRadius.circular(
@@ -9120,9 +8326,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                               alignment: const AlignmentDirectional(
                                                   0.0, 0.0),
                                               child: Padding(
-                                                padding: const EdgeInsetsDirectional
+                                                padding: EdgeInsetsDirectional
                                                     .fromSTEB(
-                                                        0.0, 8.0, 0.0, 0.0),
+                                                        0.0, 8.0 * scaleFactor, 0.0 * scaleFactor, 0.0 * scaleFactor),
                                                 child: Container(
                                                   width:
                                                       MediaQuery.sizeOf(context)
@@ -9167,9 +8373,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                               alignment: const AlignmentDirectional(
                                                   0.0, 1.0),
                                               child: Padding(
-                                                padding: const EdgeInsetsDirectional
+                                                padding: EdgeInsetsDirectional
                                                     .fromSTEB(
-                                                        0.0, 8.0, 0.0, 0.0),
+                                                        0.0, 8.0 * scaleFactor, 0.0 * scaleFactor, 0.0 * scaleFactor),
                                                 child: Container(
                                                   width:
                                                       MediaQuery.sizeOf(context)
@@ -9189,9 +8395,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                   ),
                                                   child: Padding(
                                                     padding:
-                                                        const EdgeInsetsDirectional
-                                                            .fromSTEB(16.0, 4.0,
-                                                                16.0, 0.0),
+                                                        EdgeInsetsDirectional
+                                                            .fromSTEB(16.0 * scaleFactor, 4.0 * scaleFactor,
+                                                                16.0 * scaleFactor, 0.0 * scaleFactor),
                                                     child: Text(
                                                       '1. 이상 발생시 즉시 QA에 통보\n2. 자주검사 기준서 필히 숙지 할 것.\n3. 검사주기가 전수 검사인 제품은 불량내용 및 수량만 체크할 것.\n(양호 :O  불량발생:X  치수:치수기입)',
                                                       style: FlutterFlowTheme
@@ -9199,7 +8405,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                           .bodyMedium
                                                           .override(
                                                             fontFamily: 'Inter',
-                                                            fontSize: 23.0,
+                                                            fontSize: scaleFactor * 23.0,
                                                             letterSpacing: 0.0,
                                                             fontWeight:
                                                                 FontWeight.w600,
@@ -9230,9 +8436,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                 children: [
                                                   Padding(
                                                     padding:
-                                                        const EdgeInsetsDirectional
-                                                            .fromSTEB(0.0, 0.0,
-                                                                16.0, 0.0),
+                                                        EdgeInsetsDirectional
+                                                            .fromSTEB(0.0 * scaleFactor, 0.0 * scaleFactor,
+                                                                16.0 * scaleFactor, 0.0 * scaleFactor),
                                                     child: InkWell(
                                                       splashColor:
                                                           Colors.transparent,
@@ -9266,12 +8472,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                             0.0, 0.0),
                                                     child: Padding(
                                                       padding:
-                                                          const EdgeInsetsDirectional
+                                                          EdgeInsetsDirectional
                                                               .fromSTEB(
                                                                   0.0,
-                                                                  0.0,
-                                                                  16.0,
-                                                                  0.0),
+                                                                  0.0 * scaleFactor,
+                                                                  16.0 * scaleFactor,
+                                                                  0.0 * scaleFactor),
                                                       child: Text(
                                                         '날짜 : ',
                                                         textAlign:
@@ -9282,7 +8488,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                             .override(
                                                               fontFamily:
                                                                   'Inter',
-                                                              fontSize: 35.0,
+                                                              fontSize: scaleFactor * 35.0,
                                                               letterSpacing:
                                                                   0.0,
                                                               fontWeight:
@@ -9305,7 +8511,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                           .bodyMedium
                                                           .override(
                                                             fontFamily: 'Inter',
-                                                            fontSize: 35.0,
+                                                            fontSize: scaleFactor * 35.0,
                                                             letterSpacing: 0.0,
                                                             fontWeight:
                                                                 FontWeight.w600,
@@ -9314,9 +8520,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                   ),
                                                   Padding(
                                                     padding:
-                                                        const EdgeInsetsDirectional
-                                                            .fromSTEB(16.0, 0.0,
-                                                                0.0, 0.0),
+                                                        EdgeInsetsDirectional
+                                                            .fromSTEB(16.0 * scaleFactor, 0.0 * scaleFactor,
+                                                                0.0 * scaleFactor, 0.0 * scaleFactor),
                                                     child: InkWell(
                                                       splashColor:
                                                           Colors.transparent,
@@ -9356,8 +8562,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       .override(
                                                                         fontFamily:
                                                                             'Inter Tight',
-                                                                        fontSize:
-                                                                            32.0,
+                                                                        fontSize: scaleFactor * 32.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -9430,9 +8635,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                   ),
                                                   Padding(
                                                     padding:
-                                                        const EdgeInsetsDirectional
-                                                            .fromSTEB(16.0, 0.0,
-                                                                0.0, 0.0),
+                                                        EdgeInsetsDirectional
+                                                            .fromSTEB(16.0 * scaleFactor, 0.0 * scaleFactor,
+                                                                0.0 * scaleFactor, 0.0 * scaleFactor),
                                                     child: InkWell(
                                                       splashColor:
                                                           Colors.transparent,
@@ -9509,7 +8714,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                   'Inter',
                                                               color:
                                                                   Colors.white,
-                                                              fontSize: 25.0,
+                                                              fontSize: scaleFactor * 25.0,
                                                               letterSpacing:
                                                                   0.0,
                                                               fontWeight:
@@ -9549,7 +8754,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                             .override(
                                                               fontFamily:
                                                                   'Inter',
-                                                              fontSize: 25.0,
+                                                              fontSize: scaleFactor * 25.0,
                                                               letterSpacing:
                                                                   0.0,
                                                               fontWeight:
@@ -9563,8 +8768,8 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                               ),
                                             ),
                                             Padding(
-                                              padding: const EdgeInsetsDirectional
-                                                  .fromSTEB(0.0, 8.0, 0.0, 8.0),
+                                              padding: EdgeInsetsDirectional
+                                                  .fromSTEB(0.0 * scaleFactor, 8.0 * scaleFactor, 0.0 * scaleFactor, 8.0 * scaleFactor),
                                               child: Container(
                                                 width:
                                                     MediaQuery.sizeOf(context)
@@ -9583,30 +8788,35 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                   ),
                                                 ),
                                                 child: Padding(
-                                                  padding: const EdgeInsetsDirectional
+                                                  padding: EdgeInsetsDirectional
                                                       .fromSTEB(
-                                                          8.0, 8.0, 8.0, 8.0),
-                                                  child: ClipRRect(
+                                                          8.0, 8.0 * scaleFactor, 8.0 * scaleFactor, 8.0 * scaleFactor),
+                                                  child: InkWell(
+                                                    onTap: () {
+                                                    FFAppState().setIndex();
+                                                    },
+                                                    child: ClipRRect(
                                                     borderRadius:
                                                         BorderRadius.circular(
                                                             8.0),
                                                     child: receivedImages[_model
-                                                                .tabBarCurrentIndex] !=
+                                                                .tabBarCurrentIndex][FFAppState().index] !=
                                                             null
                                                         ? Image.memory(
                                                             receivedImages[_model
-                                                                .tabBarCurrentIndex]!,
+                                                                .tabBarCurrentIndex][FFAppState().index]!,
                                                             height: 300,
                                                             width:
                                                                 double.infinity,
                                                             fit: BoxFit
                                                                 .fitHeight,
                                                           )
-                                                        : Image.network(
-                                                            'https://picsum.photos/seed/510/60',
+                                                        : Image.asset(
+                                                            'assets/images/blank.png',
                                                             width: 200.0,
                                                             height: 200.0,
                                                             fit: BoxFit.cover,
+                                                          ),
                                                           ),
                                                   ),
                                                 ),
@@ -9622,8 +8832,8 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                   CrossAxisAlignment.end,
                                               children: [      
                                                 Padding(
-                                                  padding: const EdgeInsetsDirectional
-                                                      .fromSTEB(2.0, 2.0, 2.0, 2.0),
+                                                  padding: EdgeInsetsDirectional
+                                                      .fromSTEB(2.0 * scaleFactor, 2.0 * scaleFactor, 2.0 * scaleFactor, 2.0 * scaleFactor),
                                                   child: Container(
                                                     width:
                                                         MediaQuery.sizeOf(context)
@@ -9684,8 +8894,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                             'Inter',
                                                                         color: Colors
                                                                             .white,
-                                                                        fontSize:
-                                                                            25.0,
+                                                                        fontSize: scaleFactor * 25.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -9729,8 +8938,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                             'Inter',
                                                                         color: Colors
                                                                             .white,
-                                                                        fontSize:
-                                                                            25.0,
+                                                                        fontSize: scaleFactor * 25.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -9774,8 +8982,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                             'Inter',
                                                                         color: Colors
                                                                             .white,
-                                                                        fontSize:
-                                                                            25.0,
+                                                                        fontSize: scaleFactor * 25.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -9819,8 +9026,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                             'Inter',
                                                                         color: Colors
                                                                             .white,
-                                                                        fontSize:
-                                                                            25.0,
+                                                                        fontSize: scaleFactor * 25.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -9865,8 +9071,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                             'Inter',
                                                                         color: Colors
                                                                             .white,
-                                                                        fontSize:
-                                                                            25.0,
+                                                                        fontSize: scaleFactor * 25.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -9882,52 +9087,10 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                           mainAxisSize:
                                                               MainAxisSize.max,
                                                           children: [
-                                                            Container(
-                                                              width:
-                                                                  MediaQuery.sizeOf(
-                                                                              context)
-                                                                          .width *
-                                                                      0.05,
-                                                              height:
-                                                                  MediaQuery.sizeOf(
-                                                                              context)
-                                                                          .height *
-                                                                      0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x3308018C),
-                                                                border: Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0, 0.0),
-                                                                child: Text(
-                                                                  '1',
-                                                                  style: FlutterFlowTheme
-                                                                          .of(context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            25.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight
-                                                                                .w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            IndexedText(),
-                                                            IndexedText(),
-                                                            IndexedText(),
+                                                            ClickableContainer(scaleFactor: scaleFactor, name: currentName, text: '1'),
+                                                            IndexedContainer(scaleFactor: scaleFactor),
+                                                            IndexedContainer(scaleFactor: scaleFactor),
+                                                            IndexedContainer(scaleFactor: scaleFactor),
                                                             Container(
                                                               width:
                                                                   MediaQuery.sizeOf(
@@ -9961,8 +9124,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       .override(
                                                                         fontFamily:
                                                                             'Inter',
-                                                                        fontSize:
-                                                                            23.0,
+                                                                        fontSize: scaleFactor * 23.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -9978,52 +9140,10 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                           mainAxisSize:
                                                               MainAxisSize.max,
                                                           children: [
-                                                            Container(
-                                                              width:
-                                                                  MediaQuery.sizeOf(
-                                                                              context)
-                                                                          .width *
-                                                                      0.05,
-                                                              height:
-                                                                  MediaQuery.sizeOf(
-                                                                              context)
-                                                                          .height *
-                                                                      0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x3308018C),
-                                                                border: Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0, 0.0),
-                                                                child: Text(
-                                                                  '2',
-                                                                  style: FlutterFlowTheme
-                                                                          .of(context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            25.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight
-                                                                                .w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            IndexedText(),
-                                                            IndexedText(),
-                                                            IndexedText(),
+                                                            ClickableContainer(scaleFactor: scaleFactor, name: currentName, text: '2'),
+                                                            IndexedContainer(scaleFactor: scaleFactor),
+                                                            IndexedContainer(scaleFactor: scaleFactor),
+                                                            IndexedContainer(scaleFactor: scaleFactor),
                                                             Container(
                                                               width:
                                                                   MediaQuery.sizeOf(
@@ -10057,8 +9177,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       .override(
                                                                         fontFamily:
                                                                             'Inter',
-                                                                        fontSize:
-                                                                            23.0,
+                                                                        fontSize: scaleFactor * 23.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -10074,49 +9193,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                           mainAxisSize:
                                                               MainAxisSize.max,
                                                           children: [
-                                                            Container(
-                                                              width:
-                                                                  MediaQuery.sizeOf(
-                                                                              context)
-                                                                          .width *
-                                                                      0.05,
-                                                              height:
-                                                                  MediaQuery.sizeOf(
-                                                                              context)
-                                                                          .height *
-                                                                      0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x3308018C),
-                                                                border: Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0, 0.0),
-                                                                child: Text(
-                                                                  '3',
-                                                                  style: FlutterFlowTheme
-                                                                          .of(context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            25.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight
-                                                                                .w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
+                                                            ClickableContainer(scaleFactor: scaleFactor, name: currentName, text: '3'),
                                                             Container(
                                                               width:
                                                                   MediaQuery.sizeOf(
@@ -10154,8 +9231,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       .override(
                                                                         fontFamily:
                                                                             'Inter',
-                                                                        fontSize:
-                                                                            23.0,
+                                                                        fontSize: scaleFactor * 23.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -10202,8 +9278,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       .override(
                                                                         fontFamily:
                                                                             'Inter',
-                                                                        fontSize:
-                                                                            23.0,
+                                                                        fontSize: scaleFactor * 23.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -10250,8 +9325,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       .override(
                                                                         fontFamily:
                                                                             'Inter',
-                                                                        fontSize:
-                                                                            23.0,
+                                                                        fontSize: scaleFactor * 23.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -10297,8 +9371,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       .override(
                                                                         fontFamily:
                                                                             'Inter',
-                                                                        fontSize:
-                                                                            23.0,
+                                                                        fontSize: scaleFactor * 23.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -10314,52 +9387,10 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                           mainAxisSize:
                                                               MainAxisSize.max,
                                                           children: [
-                                                            Container(
-                                                              width:
-                                                                  MediaQuery.sizeOf(
-                                                                              context)
-                                                                          .width *
-                                                                      0.05,
-                                                              height:
-                                                                  MediaQuery.sizeOf(
-                                                                              context)
-                                                                          .height *
-                                                                      0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x3308018C),
-                                                                border: Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0, 0.0),
-                                                                child: Text(
-                                                                  '4',
-                                                                  style: FlutterFlowTheme
-                                                                          .of(context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            25.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight
-                                                                                .w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            IndexedText(),
-                                                            IndexedText(),
-                                                            IndexedText(),
+                                                            ClickableContainer(scaleFactor: scaleFactor, name: currentName, text: '4'),
+                                                            IndexedContainer(scaleFactor: scaleFactor),
+                                                            IndexedContainer(scaleFactor: scaleFactor),
+                                                            IndexedContainer(scaleFactor: scaleFactor),
                                                             Container(
                                                               width:
                                                                   MediaQuery.sizeOf(
@@ -10393,8 +9424,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       .override(
                                                                         fontFamily:
                                                                             'Inter',
-                                                                        fontSize:
-                                                                            23.0,
+                                                                        fontSize: scaleFactor * 23.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -10410,52 +9440,10 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                           mainAxisSize:
                                                               MainAxisSize.max,
                                                           children: [
-                                                            Container(
-                                                              width:
-                                                                  MediaQuery.sizeOf(
-                                                                              context)
-                                                                          .width *
-                                                                      0.05,
-                                                              height:
-                                                                  MediaQuery.sizeOf(
-                                                                              context)
-                                                                          .height *
-                                                                      0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x3308018C),
-                                                                border: Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0, 0.0),
-                                                                child: Text(
-                                                                  '5',
-                                                                  style: FlutterFlowTheme
-                                                                          .of(context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            25.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight
-                                                                                .w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            IndexedText(),
-                                                            IndexedText(),
-                                                            IndexedText(),
+                                                            ClickableContainer(scaleFactor: scaleFactor, name: currentName, text: '5'),
+                                                            IndexedContainer(scaleFactor: scaleFactor),
+                                                            IndexedContainer(scaleFactor: scaleFactor),
+                                                            IndexedContainer(scaleFactor: scaleFactor),
                                                             Container(
                                                               width:
                                                                   MediaQuery.sizeOf(
@@ -10489,8 +9477,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       .override(
                                                                         fontFamily:
                                                                             'Inter',
-                                                                        fontSize:
-                                                                            23.0,
+                                                                        fontSize: scaleFactor * 23.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -10506,52 +9493,10 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                           mainAxisSize:
                                                               MainAxisSize.max,
                                                           children: [
-                                                            Container(
-                                                              width:
-                                                                  MediaQuery.sizeOf(
-                                                                              context)
-                                                                          .width *
-                                                                      0.05,
-                                                              height:
-                                                                  MediaQuery.sizeOf(
-                                                                              context)
-                                                                          .height *
-                                                                      0.04,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: const Color(
-                                                                    0x3308018C),
-                                                                border: Border.all(
-                                                                  color: const Color(
-                                                                      0x80000000),
-                                                                ),
-                                                              ),
-                                                              child: Align(
-                                                                alignment:
-                                                                    const AlignmentDirectional(
-                                                                        0.0, 0.0),
-                                                                child: Text(
-                                                                  '6',
-                                                                  style: FlutterFlowTheme
-                                                                          .of(context)
-                                                                      .bodyMedium
-                                                                      .override(
-                                                                        fontFamily:
-                                                                            'Inter',
-                                                                        fontSize:
-                                                                            25.0,
-                                                                        letterSpacing:
-                                                                            0.0,
-                                                                        fontWeight:
-                                                                            FontWeight
-                                                                                .w600,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            IndexedText(),
-                                                            IndexedText(),
-                                                            IndexedText(),
+                                                            ClickableContainer(scaleFactor: scaleFactor, name: currentName, text: '6'),
+                                                            IndexedContainer(scaleFactor: scaleFactor),
+                                                            IndexedContainer(scaleFactor: scaleFactor),
+                                                            IndexedContainer(scaleFactor: scaleFactor),
                                                             Container(
                                                               width:
                                                                   MediaQuery.sizeOf(
@@ -10585,8 +9530,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       .override(
                                                                         fontFamily:
                                                                             'Inter',
-                                                                        fontSize:
-                                                                            23.0,
+                                                                        fontSize: scaleFactor * 23.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -10636,8 +9580,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                             'Inter',
                                                                         color: Colors
                                                                             .white,
-                                                                        fontSize:
-                                                                            23.0,
+                                                                        fontSize: scaleFactor * 23.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -10674,14 +9617,14 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                         -1.0, 0.0),
                                                                 child: Padding(
                                                                   padding:
-                                                                      const EdgeInsetsDirectional
+                                                                      EdgeInsetsDirectional
                                                                           .fromSTEB(
                                                                               8.0,
-                                                                              0.0,
-                                                                              0.0,
-                                                                              0.0),
+                                                                              0.0 * scaleFactor,
+                                                                              0.0 * scaleFactor,
+                                                                              0.0 * scaleFactor),
                                                                   child: Text(
-                                                                    '수량:',
+                                                                    '수량:  ${getErrorNum(FFAppState().CurrentName)}',
                                                                     textAlign:
                                                                         TextAlign
                                                                             .center,
@@ -10691,8 +9634,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                         .override(
                                                                           fontFamily:
                                                                               'Inter',
-                                                                          fontSize:
-                                                                              23.0,
+                                                                          fontSize: scaleFactor * 23.0,
                                                                           letterSpacing:
                                                                               0.0,
                                                                           fontWeight:
@@ -10730,12 +9672,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                         -1.0, 0.0),
                                                                 child: Padding(
                                                                   padding:
-                                                                      const EdgeInsetsDirectional
+                                                                      EdgeInsetsDirectional
                                                                           .fromSTEB(
                                                                               8.0,
-                                                                              0.0,
-                                                                              0.0,
-                                                                              0.0),
+                                                                              0.0 * scaleFactor,
+                                                                              0.0 * scaleFactor,
+                                                                              0.0 * scaleFactor),
                                                                   child: Text(
                                                                     '양품 수량:',
                                                                     style: FlutterFlowTheme.of(
@@ -10744,8 +9686,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                         .override(
                                                                           fontFamily:
                                                                               'Inter',
-                                                                          fontSize:
-                                                                              23.0,
+                                                                          fontSize: scaleFactor * 23.0,
                                                                           letterSpacing:
                                                                               0.0,
                                                                           fontWeight:
@@ -10763,7 +9704,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                 ),
                                                ),
 
-                                                const DownloadButton()
+                                                const DownloadButton(type: 'week')
                                               ].addToStart(
                                                   const SizedBox(width: 40.0)),  
                                             ),
@@ -10804,8 +9745,8 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                         children: [
                                           Padding(
                                             padding:
-                                                const EdgeInsetsDirectional.fromSTEB(
-                                                    24.0, 0.0, 0.0, 0.0),
+                                                EdgeInsetsDirectional.fromSTEB(
+                                                    24.0, 0.0 * scaleFactor, 0.0 * scaleFactor, 0.0 * scaleFactor),
                                             child: Container(
                                               width: MediaQuery.sizeOf(context)
                                                       .width *
@@ -10824,9 +9765,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                 children: [
                                                   Padding(
                                                     padding:
-                                                        const EdgeInsetsDirectional
-                                                            .fromSTEB(4.0, 4.0,
-                                                                4.0, 4.0),
+                                                        EdgeInsetsDirectional
+                                                            .fromSTEB(4.0 * scaleFactor, 4.0 * scaleFactor,
+                                                                4.0 * scaleFactor, 4.0 * scaleFactor),
                                                     child: ClipRRect(
                                                       borderRadius:
                                                           BorderRadius.circular(
@@ -10844,9 +9785,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                   ),
                                                   Padding(
                                                     padding:
-                                                        const EdgeInsetsDirectional
-                                                            .fromSTEB(8.0, 0.0,
-                                                                0.0, 0.0),
+                                                        EdgeInsetsDirectional
+                                                            .fromSTEB(8.0 * scaleFactor, 0.0 * scaleFactor,
+                                                                0.0 * scaleFactor, 0.0 * scaleFactor),
                                                     child: Text(
                                                       '자주검사 체크시트',
                                                       textAlign:
@@ -10856,7 +9797,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                           .bodyMedium
                                                           .override(
                                                             fontFamily: 'Inter',
-                                                            fontSize: 50.0,
+                                                            fontSize: scaleFactor * 50.0,
                                                             letterSpacing: 0.0,
                                                             fontWeight:
                                                                 FontWeight.w600,
@@ -10931,8 +9872,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       'Inter',
                                                                   color: Colors
                                                                       .black,
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -10977,8 +9917,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                 .override(
                                                                   fontFamily:
                                                                       'Inter',
-                                                                  fontSize:
-                                                                      30.0,
+                                                                  fontSize: scaleFactor * 30.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -11024,8 +9963,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       'Inter',
                                                                   color: Colors
                                                                       .black,
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -11070,8 +10008,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                 .override(
                                                                   fontFamily:
                                                                       'Inter',
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -11121,8 +10058,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       'Inter',
                                                                   color: Colors
                                                                       .black,
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -11167,8 +10103,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                 .override(
                                                                   fontFamily:
                                                                       'Inter',
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -11214,8 +10149,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       'Inter',
                                                                   color: Colors
                                                                       .black,
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -11257,8 +10191,8 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                         8.0),
                                                             child: Image.asset(
                                                               'assets/images/1vygu_1.png',
-                                                              width: 200.0,
-                                                              height: 200.0,
+                                                              width: 200.0 * scaleFactor,
+                                                              height: 200.0 * scaleFactor,
                                                               fit: BoxFit
                                                                   .fitHeight,
                                                             ),
@@ -11307,8 +10241,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       'Inter',
                                                                   color: Colors
                                                                       .black,
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -11341,12 +10274,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                         ),
                                                         child: Padding(
                                                           padding:
-                                                              const EdgeInsetsDirectional
+                                                              EdgeInsetsDirectional
                                                                   .fromSTEB(
                                                                       0.0,
-                                                                      0.0,
-                                                                      4.0,
-                                                                      0.0),
+                                                                      0.0 * scaleFactor,
+                                                                      4.0 * scaleFactor,
+                                                                      0.0 * scaleFactor),
                                                           child: Row(
                                                             mainAxisSize:
                                                                 MainAxisSize
@@ -11361,12 +10294,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                         0.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: const EdgeInsetsDirectional
+                                                                  padding: EdgeInsetsDirectional
                                                                       .fromSTEB(
-                                                                          4.0,
-                                                                          0.0,
-                                                                          4.0,
-                                                                          0.0),
+                                                                          4.0 * scaleFactor,
+                                                                          0.0 * scaleFactor,
+                                                                          4.0 * scaleFactor,
+                                                                          0.0 * scaleFactor),
                                                                   child:
                                                                       Container(
                                                                     width: MediaQuery.sizeOf(context)
@@ -11391,8 +10324,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                     .override(
                                                                       fontFamily:
                                                                           'Inter',
-                                                                      fontSize:
-                                                                          22.0,
+                                                                      fontSize: scaleFactor * 15.0,
                                                                       letterSpacing:
                                                                           0.0,
                                                                       fontWeight:
@@ -11406,12 +10338,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                         0.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: const EdgeInsetsDirectional
+                                                                  padding: EdgeInsetsDirectional
                                                                       .fromSTEB(
-                                                                          12.0,
-                                                                          0.0,
-                                                                          4.0,
-                                                                          0.0),
+                                                                          12.0 * scaleFactor,
+                                                                          0.0 * scaleFactor,
+                                                                          4.0 * scaleFactor,
+                                                                          0.0 * scaleFactor),
                                                                   child:
                                                                       Container(
                                                                     width: MediaQuery.sizeOf(context)
@@ -11442,8 +10374,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                     .override(
                                                                       fontFamily:
                                                                           'Inter',
-                                                                      fontSize:
-                                                                          22.0,
+                                                                      fontSize: scaleFactor * 15.0,
                                                                       letterSpacing:
                                                                           0.0,
                                                                       fontWeight:
@@ -11457,12 +10388,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                         0.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: const EdgeInsetsDirectional
+                                                                  padding: EdgeInsetsDirectional
                                                                       .fromSTEB(
                                                                           12.0,
-                                                                          0.0,
-                                                                          4.0,
-                                                                          0.0),
+                                                                          0.0 * scaleFactor,
+                                                                          4.0 * scaleFactor,
+                                                                          0.0 * scaleFactor),
                                                                   child:
                                                                       Container(
                                                                     width: MediaQuery.sizeOf(context)
@@ -11493,8 +10424,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                     .override(
                                                                       fontFamily:
                                                                           'Inter',
-                                                                      fontSize:
-                                                                          22.0,
+                                                                      fontSize: scaleFactor * 15.0,
                                                                       letterSpacing:
                                                                           0.0,
                                                                       fontWeight:
@@ -11508,12 +10438,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                         0.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: const EdgeInsetsDirectional
+                                                                  padding: EdgeInsetsDirectional
                                                                       .fromSTEB(
-                                                                          12.0,
-                                                                          0.0,
-                                                                          4.0,
-                                                                          0.0),
+                                                                          12.0 * scaleFactor,
+                                                                          0.0 * scaleFactor,
+                                                                          4.0 * scaleFactor,
+                                                                          0.0 * scaleFactor),
                                                                   child:
                                                                       Container(
                                                                     width: MediaQuery.sizeOf(context)
@@ -11544,8 +10474,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                     .override(
                                                                       fontFamily:
                                                                           'Inter',
-                                                                      fontSize:
-                                                                          22.0,
+                                                                      fontSize: scaleFactor * 15.0 / 2,
                                                                       letterSpacing:
                                                                           0.0,
                                                                       fontWeight:
@@ -11593,8 +10522,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       'Inter',
                                                                   color: Colors
                                                                       .black,
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -11637,8 +10565,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                 .override(
                                                                   fontFamily:
                                                                       'Inter',
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -11663,8 +10590,8 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                   child: Align(
                                     alignment: const AlignmentDirectional(0.0, 0.0),
                                     child: Padding(
-                                      padding: const EdgeInsetsDirectional.fromSTEB(
-                                          0.0, 12.0, 0.0, 0.0),
+                                      padding: EdgeInsetsDirectional.fromSTEB(
+                                          0.0, 12.0 * scaleFactor, 0.0 * scaleFactor, 0.0 * scaleFactor),
                                       child: Row(
                                         mainAxisSize: MainAxisSize.max,
                                         mainAxisAlignment:
@@ -11703,12 +10630,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                     ),
                                                     child: Padding(
                                                       padding:
-                                                          const EdgeInsetsDirectional
+                                                          EdgeInsetsDirectional
                                                               .fromSTEB(
                                                                   8.0,
-                                                                  8.0,
-                                                                  8.0,
-                                                                  8.0),
+                                                                  8.0 * scaleFactor,
+                                                                  8.0 * scaleFactor,
+                                                                  8.0 * scaleFactor),
                                                       child: ClipRRect(
                                                         borderRadius:
                                                             BorderRadius
@@ -11729,9 +10656,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                           0.0, 0.0),
                                                   child: Padding(
                                                     padding:
-                                                        const EdgeInsetsDirectional
-                                                            .fromSTEB(0.0, 8.0,
-                                                                0.0, 0.0),
+                                                        EdgeInsetsDirectional
+                                                            .fromSTEB(0.0 * scaleFactor, 8.0 * scaleFactor,
+                                                                0.0 * scaleFactor, 0.0 * scaleFactor),
                                                     child: Container(
                                                       width: MediaQuery.sizeOf(
                                                                   context)
@@ -11782,9 +10709,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                           0.0, 1.0),
                                                   child: Padding(
                                                     padding:
-                                                        const EdgeInsetsDirectional
-                                                            .fromSTEB(0.0, 8.0,
-                                                                0.0, 0.0),
+                                                        EdgeInsetsDirectional
+                                                            .fromSTEB(0.0 * scaleFactor, 8.0 * scaleFactor,
+                                                                0.0 * scaleFactor, 0.0 * scaleFactor),
                                                     child: Container(
                                                       width: MediaQuery.sizeOf(
                                                                   context)
@@ -11804,12 +10731,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                       ),
                                                       child: Padding(
                                                         padding:
-                                                            const EdgeInsetsDirectional
+                                                            EdgeInsetsDirectional
                                                                 .fromSTEB(
                                                                     4.0,
-                                                                    0.0,
-                                                                    4.0,
-                                                                    0.0),
+                                                                    0.0 * scaleFactor,
+                                                                    4.0 * scaleFactor,
+                                                                    0.0 * scaleFactor),
                                                         child: Text(
                                                           '1. 이상 발생시 즉시 품질에 통보\n2. 자주검사 기준서 필히 숙지할것\n(양호 :O  불량발생:X  치수:치수기입)',
                                                           textAlign:
@@ -11820,7 +10747,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                               .override(
                                                                 fontFamily:
                                                                     'Inter',
-                                                                fontSize: 20.0,
+                                                                fontSize: scaleFactor * 20.0,
                                                                 letterSpacing:
                                                                     0.0,
                                                                 fontWeight:
@@ -11856,12 +10783,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                     children: [
                                                       Padding(
                                                         padding:
-                                                            const EdgeInsetsDirectional
+                                                            EdgeInsetsDirectional
                                                                 .fromSTEB(
                                                                     0.0,
-                                                                    0.0,
-                                                                    16.0,
-                                                                    0.0),
+                                                                    0.0 * scaleFactor,
+                                                                    16.0 * scaleFactor,
+                                                                    0.0 * scaleFactor),
                                                         child: InkWell(
                                                           splashColor: Colors
                                                               .transparent,
@@ -11895,12 +10822,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                 0.0, 0.0),
                                                         child: Padding(
                                                           padding:
-                                                              const EdgeInsetsDirectional
+                                                              EdgeInsetsDirectional
                                                                   .fromSTEB(
                                                                       0.0,
-                                                                      0.0,
-                                                                      16.0,
-                                                                      0.0),
+                                                                      0.0 * scaleFactor,
+                                                                      16.0 * scaleFactor,
+                                                                      0.0 * scaleFactor),
                                                           child: Text(
                                                             '날짜 : ',
                                                             textAlign: TextAlign
@@ -11911,8 +10838,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                 .override(
                                                                   fontFamily:
                                                                       'Inter',
-                                                                  fontSize:
-                                                                      35.0,
+                                                                  fontSize: scaleFactor * 35.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -11937,7 +10863,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                               .override(
                                                                 fontFamily:
                                                                     'Inter',
-                                                                fontSize: 35.0,
+                                                                fontSize: scaleFactor * 35.0,
                                                                 letterSpacing:
                                                                     0.0,
                                                                 fontWeight:
@@ -11948,12 +10874,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                       ),
                                                       Padding(
                                                         padding:
-                                                            const EdgeInsetsDirectional
+                                                            EdgeInsetsDirectional
                                                                 .fromSTEB(
                                                                     16.0,
-                                                                    0.0,
-                                                                    0.0,
-                                                                    0.0),
+                                                                    0.0 * scaleFactor,
+                                                                    0.0 * scaleFactor,
+                                                                    0.0 * scaleFactor),
                                                         child: InkWell(
                                                           splashColor: Colors
                                                               .transparent,
@@ -11994,8 +10920,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       .override(
                                                                         fontFamily:
                                                                             'Inter Tight',
-                                                                        fontSize:
-                                                                            32.0,
+                                                                        fontSize: scaleFactor * 32.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -12070,12 +10995,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                       ),
                                                       Padding(
                                                         padding:
-                                                            const EdgeInsetsDirectional
+                                                            EdgeInsetsDirectional
                                                                 .fromSTEB(
                                                                     16.0,
-                                                                    0.0,
-                                                                    0.0,
-                                                                    0.0),
+                                                                    0.0 * scaleFactor,
+                                                                    0.0 * scaleFactor,
+                                                                    0.0 * scaleFactor),
                                                         child: InkWell(
                                                           splashColor: Colors
                                                               .transparent,
@@ -12159,8 +11084,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       'Inter',
                                                                   color: Colors
                                                                       .white,
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -12203,8 +11127,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                 .override(
                                                                   fontFamily:
                                                                       'Inter',
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -12218,9 +11141,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                   ),
                                                 ),
                                                 Padding(
-                                                  padding: const EdgeInsetsDirectional
+                                                  padding: EdgeInsetsDirectional
                                                       .fromSTEB(
-                                                          0.0, 4.0, 0.0, 4.0),
+                                                          0.0, 4.0 * scaleFactor, 0.0 * scaleFactor, 4.0 * scaleFactor),
                                                   child: Container(
                                                     width: MediaQuery.sizeOf(
                                                                 context)
@@ -12240,36 +11163,40 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                     ),
                                                     child: Padding(
                                                       padding:
-                                                          const EdgeInsetsDirectional
+                                                          EdgeInsetsDirectional
                                                               .fromSTEB(
                                                                   8.0,
-                                                                  8.0,
-                                                                  8.0,
-                                                                  8.0),
-                                                      child: ClipRRect(
+                                                                  8.0 * scaleFactor,
+                                                                  8.0 * scaleFactor,
+                                                                  8.0 * scaleFactor),
+                                                      child: InkWell(
+                                                      onTap: (){
+                                                      FFAppState().setIndex();
+                                                      },
+                                                      child:ClipRRect(
                                                         borderRadius:
                                                             BorderRadius
                                                                 .circular(8.0),
                                                         child: receivedImages[_model
-                                                                    .tabBarCurrentIndex] !=
+                                                                    .tabBarCurrentIndex][FFAppState().index] !=
                                                                 null
                                                             ? Image.memory(
                                                                 receivedImages[
-                                                                    _model
-                                                                        .tabBarCurrentIndex]!,
+                                                                    _model.tabBarCurrentIndex][FFAppState().index]!,
                                                                 height: 300,
                                                                 width: double
                                                                     .infinity,
                                                                 fit: BoxFit
                                                                     .fitHeight,
                                                               )
-                                                            : Image.network(
-                                                                'https://picsum.photos/seed/510/60',
+                                                            : Image.asset(
+                                                                'assets/images/blank.png',
                                                                 width: 200.0,
                                                                 height: 200.0,
                                                                 fit: BoxFit
                                                                     .cover,
                                                               ),
+                                                      ),
                                                       ),
                                                     ),
                                                   ),
@@ -12284,9 +11211,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                       CrossAxisAlignment.end,
                                                   children: [  
                                                     Padding(
-                                                      padding: const EdgeInsetsDirectional
+                                                      padding: EdgeInsetsDirectional
                                                           .fromSTEB(
-                                                              4.0, 4.0, 4.0, 4.0),
+                                                              4.0, 4.0 * scaleFactor, 4.0 * scaleFactor, 4.0 * scaleFactor),
                                                       child: Container(
                                                         width: MediaQuery.sizeOf(
                                                                     context)
@@ -12349,8 +11276,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                                 'Inter',
                                                                             color: Colors
                                                                                 .white,
-                                                                            fontSize:
-                                                                                25.0,
+                                                                            fontSize: scaleFactor * 25.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -12395,8 +11321,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                                 'Inter',
                                                                             color: Colors
                                                                                 .white,
-                                                                            fontSize:
-                                                                                25.0,
+                                                                            fontSize: scaleFactor * 25.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -12441,8 +11366,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                                 'Inter',
                                                                             color: Colors
                                                                                 .white,
-                                                                            fontSize:
-                                                                                25.0,
+                                                                            fontSize: scaleFactor * 25.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -12487,8 +11411,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                                 'Inter',
                                                                             color: Colors
                                                                                 .white,
-                                                                            fontSize:
-                                                                                25.0,
+                                                                            fontSize: scaleFactor * 25.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -12534,8 +11457,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                                 'Inter',
                                                                             color: Colors
                                                                                 .white,
-                                                                            fontSize:
-                                                                                25.0,
+                                                                            fontSize: scaleFactor * 25.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -12550,53 +11472,10 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                               mainAxisSize:
                                                                   MainAxisSize.max,
                                                               children: [
-                                                                Container(
-                                                                  width: MediaQuery
-                                                                              .sizeOf(
-                                                                                  context)
-                                                                          .width *
-                                                                      0.05,
-                                                                  height: MediaQuery
-                                                                              .sizeOf(
-                                                                                  context)
-                                                                          .height *
-                                                                      0.04,
-                                                                  decoration:
-                                                                      BoxDecoration(
-                                                                    color: const Color(
-                                                                        0x3308018C),
-                                                                    border:
-                                                                        Border.all(
-                                                                      color: const Color(
-                                                                          0x80000000),
-                                                                    ),
-                                                                  ),
-                                                                  child: Align(
-                                                                    alignment:
-                                                                        const AlignmentDirectional(
-                                                                            0.0,
-                                                                            0.0),
-                                                                    child: Text(
-                                                                      '1',
-                                                                      style: FlutterFlowTheme.of(
-                                                                              context)
-                                                                          .bodyMedium
-                                                                          .override(
-                                                                            fontFamily:
-                                                                                'Inter',
-                                                                            fontSize:
-                                                                                25.0,
-                                                                            letterSpacing:
-                                                                                0.0,
-                                                                            fontWeight:
-                                                                                FontWeight.w600,
-                                                                          ),
-                                                                    ),
-                                                                  ),
-                                                                ),
-                                                                IndexedText(),
-                                                                IndexedText(),
-                                                                IndexedText(),
+                                                                ClickableContainer(scaleFactor: scaleFactor, name: currentName, text: '1'),
+                                                                IndexedContainer(scaleFactor: scaleFactor),
+                                                                IndexedContainer(scaleFactor: scaleFactor),
+                                                                IndexedContainer(scaleFactor: scaleFactor),
                                                                 Container(
                                                                   width: MediaQuery
                                                                               .sizeOf(
@@ -12632,8 +11511,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                           .override(
                                                                             fontFamily:
                                                                                 'Inter',
-                                                                            fontSize:
-                                                                                23.0,
+                                                                            fontSize: scaleFactor * 23.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -12648,50 +11526,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                               mainAxisSize:
                                                                   MainAxisSize.max,
                                                               children: [
-                                                                Container(
-                                                                  width: MediaQuery
-                                                                              .sizeOf(
-                                                                                  context)
-                                                                          .width *
-                                                                      0.05,
-                                                                  height: MediaQuery
-                                                                              .sizeOf(
-                                                                                  context)
-                                                                          .height *
-                                                                      0.04,
-                                                                  decoration:
-                                                                      BoxDecoration(
-                                                                    color: const Color(
-                                                                        0x3308018C),
-                                                                    border:
-                                                                        Border.all(
-                                                                      color: const Color(
-                                                                          0x80000000),
-                                                                    ),
-                                                                  ),
-                                                                  child: Align(
-                                                                    alignment:
-                                                                        const AlignmentDirectional(
-                                                                            0.0,
-                                                                            0.0),
-                                                                    child: Text(
-                                                                      '2',
-                                                                      style: FlutterFlowTheme.of(
-                                                                              context)
-                                                                          .bodyMedium
-                                                                          .override(
-                                                                            fontFamily:
-                                                                                'Inter',
-                                                                            fontSize:
-                                                                                25.0,
-                                                                            letterSpacing:
-                                                                                0.0,
-                                                                            fontWeight:
-                                                                                FontWeight.w600,
-                                                                          ),
-                                                                    ),
-                                                                  ),
-                                                                ),
+                                                                ClickableContainer(scaleFactor: scaleFactor, name: currentName, text: '2'),
                                                                 Container(
                                                                   width: MediaQuery
                                                                               .sizeOf(
@@ -12731,8 +11566,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                           .override(
                                                                             fontFamily:
                                                                                 'Inter',
-                                                                            fontSize:
-                                                                                23.0,
+                                                                            fontSize: scaleFactor * 23.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -12780,8 +11614,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                           .override(
                                                                             fontFamily:
                                                                                 'Inter',
-                                                                            fontSize:
-                                                                                23.0,
+                                                                            fontSize: scaleFactor * 23.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -12829,8 +11662,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                           .override(
                                                                             fontFamily:
                                                                                 'Inter',
-                                                                            fontSize:
-                                                                                23.0,
+                                                                            fontSize: scaleFactor * 23.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -12877,8 +11709,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                           .override(
                                                                             fontFamily:
                                                                                 'Inter',
-                                                                            fontSize:
-                                                                                23.0,
+                                                                            fontSize: scaleFactor * 23.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -12893,50 +11724,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                               mainAxisSize:
                                                                   MainAxisSize.max,
                                                               children: [
-                                                                Container(
-                                                                  width: MediaQuery
-                                                                              .sizeOf(
-                                                                                  context)
-                                                                          .width *
-                                                                      0.05,
-                                                                  height: MediaQuery
-                                                                              .sizeOf(
-                                                                                  context)
-                                                                          .height *
-                                                                      0.04,
-                                                                  decoration:
-                                                                      BoxDecoration(
-                                                                    color: const Color(
-                                                                        0x3308018C),
-                                                                    border:
-                                                                        Border.all(
-                                                                      color: const Color(
-                                                                          0x80000000),
-                                                                    ),
-                                                                  ),
-                                                                  child: Align(
-                                                                    alignment:
-                                                                        const AlignmentDirectional(
-                                                                            0.0,
-                                                                            0.0),
-                                                                    child: Text(
-                                                                      '3',
-                                                                      style: FlutterFlowTheme.of(
-                                                                              context)
-                                                                          .bodyMedium
-                                                                          .override(
-                                                                            fontFamily:
-                                                                                'Inter',
-                                                                            fontSize:
-                                                                                25.0,
-                                                                            letterSpacing:
-                                                                                0.0,
-                                                                            fontWeight:
-                                                                                FontWeight.w600,
-                                                                          ),
-                                                                    ),
-                                                                  ),
-                                                                ),
+                                                                ClickableContainer(scaleFactor: scaleFactor, name: currentName, text: '3'),
                                                                 Container(
                                                                   width: MediaQuery
                                                                               .sizeOf(
@@ -12976,8 +11764,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                           .override(
                                                                             fontFamily:
                                                                                 'Inter',
-                                                                            fontSize:
-                                                                                23.0,
+                                                                            fontSize: scaleFactor * 23.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -13025,8 +11812,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                           .override(
                                                                             fontFamily:
                                                                                 'Inter',
-                                                                            fontSize:
-                                                                                23.0,
+                                                                            fontSize: scaleFactor * 23.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -13074,8 +11860,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                           .override(
                                                                             fontFamily:
                                                                                 'Inter',
-                                                                            fontSize:
-                                                                                23.0,
+                                                                            fontSize: scaleFactor * 23.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -13122,8 +11907,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                           .override(
                                                                             fontFamily:
                                                                                 'Inter',
-                                                                            fontSize:
-                                                                                23.0,
+                                                                            fontSize: scaleFactor * 23.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -13138,50 +11922,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                               mainAxisSize:
                                                                   MainAxisSize.max,
                                                               children: [
-                                                                Container(
-                                                                  width: MediaQuery
-                                                                              .sizeOf(
-                                                                                  context)
-                                                                          .width *
-                                                                      0.05,
-                                                                  height: MediaQuery
-                                                                              .sizeOf(
-                                                                                  context)
-                                                                          .height *
-                                                                      0.04,
-                                                                  decoration:
-                                                                      BoxDecoration(
-                                                                    color: const Color(
-                                                                        0x3308018C),
-                                                                    border:
-                                                                        Border.all(
-                                                                      color: const Color(
-                                                                          0x80000000),
-                                                                    ),
-                                                                  ),
-                                                                  child: Align(
-                                                                    alignment:
-                                                                        const AlignmentDirectional(
-                                                                            0.0,
-                                                                            0.0),
-                                                                    child: Text(
-                                                                      '4',
-                                                                      style: FlutterFlowTheme.of(
-                                                                              context)
-                                                                          .bodyMedium
-                                                                          .override(
-                                                                            fontFamily:
-                                                                                'Inter',
-                                                                            fontSize:
-                                                                                25.0,
-                                                                            letterSpacing:
-                                                                                0.0,
-                                                                            fontWeight:
-                                                                                FontWeight.w600,
-                                                                          ),
-                                                                    ),
-                                                                  ),
-                                                                ),
+                                                                ClickableContainer(scaleFactor: scaleFactor, name: currentName, text: '4'),
                                                                 Container(
                                                                   width: MediaQuery
                                                                               .sizeOf(
@@ -13221,8 +11962,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                           .override(
                                                                             fontFamily:
                                                                                 'Inter',
-                                                                            fontSize:
-                                                                                23.0,
+                                                                            fontSize: scaleFactor * 23.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -13270,8 +12010,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                           .override(
                                                                             fontFamily:
                                                                                 'Inter',
-                                                                            fontSize:
-                                                                                23.0,
+                                                                            fontSize: scaleFactor * 23.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -13319,8 +12058,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                           .override(
                                                                             fontFamily:
                                                                                 'Inter',
-                                                                            fontSize:
-                                                                                23.0,
+                                                                            fontSize: scaleFactor * 23.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -13367,8 +12105,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                           .override(
                                                                             fontFamily:
                                                                                 'Inter',
-                                                                            fontSize:
-                                                                                23.0,
+                                                                            fontSize: scaleFactor * 23.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -13383,53 +12120,10 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                               mainAxisSize:
                                                                   MainAxisSize.max,
                                                               children: [
-                                                                Container(
-                                                                  width: MediaQuery
-                                                                              .sizeOf(
-                                                                                  context)
-                                                                          .width *
-                                                                      0.05,
-                                                                  height: MediaQuery
-                                                                              .sizeOf(
-                                                                                  context)
-                                                                          .height *
-                                                                      0.04,
-                                                                  decoration:
-                                                                      BoxDecoration(
-                                                                    color: const Color(
-                                                                        0x3308018C),
-                                                                    border:
-                                                                        Border.all(
-                                                                      color: const Color(
-                                                                          0x80000000),
-                                                                    ),
-                                                                  ),
-                                                                  child: Align(
-                                                                    alignment:
-                                                                        const AlignmentDirectional(
-                                                                            0.0,
-                                                                            0.0),
-                                                                    child: Text(
-                                                                      '5',
-                                                                      style: FlutterFlowTheme.of(
-                                                                              context)
-                                                                          .bodyMedium
-                                                                          .override(
-                                                                            fontFamily:
-                                                                                'Inter',
-                                                                            fontSize:
-                                                                                25.0,
-                                                                            letterSpacing:
-                                                                                0.0,
-                                                                            fontWeight:
-                                                                                FontWeight.w600,
-                                                                          ),
-                                                                    ),
-                                                                  ),
-                                                                ),
-                                                                IndexedText(),
-                                                                IndexedText(),
-                                                                IndexedText(),
+                                                                ClickableContainer(scaleFactor: scaleFactor, name: currentName, text: '5'),
+                                                                IndexedContainer(scaleFactor: scaleFactor),
+                                                                IndexedContainer(scaleFactor: scaleFactor),
+                                                                IndexedContainer(scaleFactor: scaleFactor),
                                                                 Container(
                                                                   width: MediaQuery
                                                                               .sizeOf(
@@ -13465,8 +12159,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                           .override(
                                                                             fontFamily:
                                                                                 'Inter',
-                                                                            fontSize:
-                                                                                23.0,
+                                                                            fontSize: scaleFactor * 23.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -13481,53 +12174,10 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                               mainAxisSize:
                                                                   MainAxisSize.max,
                                                               children: [
-                                                                Container(
-                                                                  width: MediaQuery
-                                                                              .sizeOf(
-                                                                                  context)
-                                                                          .width *
-                                                                      0.05,
-                                                                  height: MediaQuery
-                                                                              .sizeOf(
-                                                                                  context)
-                                                                          .height *
-                                                                      0.04,
-                                                                  decoration:
-                                                                      BoxDecoration(
-                                                                    color: const Color(
-                                                                        0x3308018C),
-                                                                    border:
-                                                                        Border.all(
-                                                                      color: const Color(
-                                                                          0x80000000),
-                                                                    ),
-                                                                  ),
-                                                                  child: Align(
-                                                                    alignment:
-                                                                        const AlignmentDirectional(
-                                                                            0.0,
-                                                                            0.0),
-                                                                    child: Text(
-                                                                      '6',
-                                                                      style: FlutterFlowTheme.of(
-                                                                              context)
-                                                                          .bodyMedium
-                                                                          .override(
-                                                                            fontFamily:
-                                                                                'Inter',
-                                                                            fontSize:
-                                                                                25.0,
-                                                                            letterSpacing:
-                                                                                0.0,
-                                                                            fontWeight:
-                                                                                FontWeight.w600,
-                                                                          ),
-                                                                    ),
-                                                                  ),
-                                                                ),
-                                                                IndexedText(),
-                                                                IndexedText(),
-                                                                IndexedText(),
+                                                                ClickableContainer(scaleFactor: scaleFactor, name: currentName, text: '6'),
+                                                                IndexedContainer(scaleFactor: scaleFactor),
+                                                                IndexedContainer(scaleFactor: scaleFactor),
+                                                                IndexedContainer(scaleFactor: scaleFactor),
                                                                 Container(
                                                                   width: MediaQuery
                                                                               .sizeOf(
@@ -13563,8 +12213,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                           .override(
                                                                             fontFamily:
                                                                                 'Inter',
-                                                                            fontSize:
-                                                                                23.0,
+                                                                            fontSize: scaleFactor * 23.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -13613,8 +12262,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                           .override(
                                                                             fontFamily:
                                                                                 'Inter',
-                                                                            fontSize:
-                                                                                25.0,
+                                                                            fontSize: scaleFactor * 25.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -13623,9 +12271,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                     ),
                                                                   ),
                                                                 ),
-                                                                IndexedText(),
-                                                                IndexedText(),
-                                                                IndexedText(),
+                                                                IndexedContainer(scaleFactor: scaleFactor),
+                                                                IndexedContainer(scaleFactor: scaleFactor),
+                                                                IndexedContainer(scaleFactor: scaleFactor),
                                                                 Container(
                                                                   width: MediaQuery
                                                                               .sizeOf(
@@ -13661,8 +12309,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                           .override(
                                                                             fontFamily:
                                                                                 'Inter',
-                                                                            fontSize:
-                                                                                23.0,
+                                                                            fontSize: scaleFactor * 23.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -13711,8 +12358,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                           .override(
                                                                             fontFamily:
                                                                                 'Inter',
-                                                                            fontSize:
-                                                                                25.0,
+                                                                            fontSize: scaleFactor * 25.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -13721,9 +12367,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                     ),
                                                                   ),
                                                                 ),
-                                                                IndexedText(),
-                                                                IndexedText(),
-                                                                IndexedText(),
+                                                                IndexedContainer(scaleFactor: scaleFactor),
+                                                                IndexedContainer(scaleFactor: scaleFactor),
+                                                                IndexedContainer(scaleFactor: scaleFactor),
                                                                 Container(
                                                                   width: MediaQuery
                                                                               .sizeOf(
@@ -13759,8 +12405,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                           .override(
                                                                             fontFamily:
                                                                                 'Inter',
-                                                                            fontSize:
-                                                                                23.0,
+                                                                            fontSize: scaleFactor * 23.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -13776,7 +12421,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                     ),
                                                   ),
                                                 ),
-                                                const DownloadButton()
+                                                const DownloadButton(type: 'week')
                                               ].addToStart(
                                                   const SizedBox(width: 40.0)),
                                             ),
@@ -13818,8 +12463,8 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                         children: [
                                           Padding(
                                             padding:
-                                                const EdgeInsetsDirectional.fromSTEB(
-                                                    24.0, 0.0, 0.0, 0.0),
+                                                EdgeInsetsDirectional.fromSTEB(
+                                                    24.0, 0.0 * scaleFactor, 0.0 * scaleFactor, 0.0 * scaleFactor),
                                             child: Container(
                                               width: MediaQuery.sizeOf(context)
                                                       .width *
@@ -13838,9 +12483,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                 children: [
                                                   Padding(
                                                     padding:
-                                                        const EdgeInsetsDirectional
-                                                            .fromSTEB(4.0, 4.0,
-                                                                4.0, 4.0),
+                                                        EdgeInsetsDirectional
+                                                            .fromSTEB(4.0 * scaleFactor, 4.0 * scaleFactor,
+                                                                4.0 * scaleFactor, 4.0 * scaleFactor),
                                                     child: ClipRRect(
                                                       borderRadius:
                                                           BorderRadius.circular(
@@ -13858,9 +12503,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                   ),
                                                   Padding(
                                                     padding:
-                                                        const EdgeInsetsDirectional
-                                                            .fromSTEB(8.0, 0.0,
-                                                                0.0, 0.0),
+                                                        EdgeInsetsDirectional
+                                                            .fromSTEB(8.0 * scaleFactor, 0.0 * scaleFactor,
+                                                                0.0 * scaleFactor, 0.0 * scaleFactor),
                                                     child: Text(
                                                       '자주검사 체크시트',
                                                       textAlign:
@@ -13870,7 +12515,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                           .bodyMedium
                                                           .override(
                                                             fontFamily: 'Inter',
-                                                            fontSize: 50.0,
+                                                            fontSize: scaleFactor * 50.0,
                                                             letterSpacing: 0.0,
                                                             fontWeight:
                                                                 FontWeight.w600,
@@ -13945,8 +12590,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       'Inter',
                                                                   color: Colors
                                                                       .black,
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -13991,8 +12635,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                 .override(
                                                                   fontFamily:
                                                                       'Inter',
-                                                                  fontSize:
-                                                                      30.0,
+                                                                  fontSize: scaleFactor * 30.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -14038,8 +12681,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       'Inter',
                                                                   color: Colors
                                                                       .black,
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -14084,8 +12726,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                 .override(
                                                                   fontFamily:
                                                                       'Inter',
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -14135,8 +12776,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       'Inter',
                                                                   color: Colors
                                                                       .black,
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -14181,8 +12821,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                 .override(
                                                                   fontFamily:
                                                                       'Inter',
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -14228,8 +12867,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       'Inter',
                                                                   color: Colors
                                                                       .black,
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -14321,8 +12959,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       'Inter',
                                                                   color: Colors
                                                                       .black,
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -14355,12 +12992,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                         ),
                                                         child: Padding(
                                                           padding:
-                                                              const EdgeInsetsDirectional
+                                                              EdgeInsetsDirectional
                                                                   .fromSTEB(
                                                                       0.0,
-                                                                      0.0,
-                                                                      4.0,
-                                                                      0.0),
+                                                                      0.0 * scaleFactor,
+                                                                      4.0 * scaleFactor,
+                                                                      0.0 * scaleFactor),
                                                           child: Row(
                                                             mainAxisSize:
                                                                 MainAxisSize
@@ -14375,12 +13012,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                         0.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: const EdgeInsetsDirectional
+                                                                  padding: EdgeInsetsDirectional
                                                                       .fromSTEB(
-                                                                          4.0,
-                                                                          0.0,
-                                                                          4.0,
-                                                                          0.0),
+                                                                          4.0 * scaleFactor,
+                                                                          0.0 * scaleFactor,
+                                                                          4.0 * scaleFactor,
+                                                                          0.0 * scaleFactor),
                                                                   child:
                                                                       Container(
                                                                     width: MediaQuery.sizeOf(context)
@@ -14405,8 +13042,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                     .override(
                                                                       fontFamily:
                                                                           'Inter',
-                                                                      fontSize:
-                                                                          22.0,
+                                                                      fontSize: scaleFactor * 15.0,
                                                                       letterSpacing:
                                                                           0.0,
                                                                       fontWeight:
@@ -14420,12 +13056,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                         0.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: const EdgeInsetsDirectional
+                                                                  padding: EdgeInsetsDirectional
                                                                       .fromSTEB(
-                                                                          12.0,
-                                                                          0.0,
-                                                                          4.0,
-                                                                          0.0),
+                                                                          12.0 * scaleFactor,
+                                                                          0.0 * scaleFactor,
+                                                                          4.0 * scaleFactor,
+                                                                          0.0 * scaleFactor),
                                                                   child:
                                                                       Container(
                                                                     width: MediaQuery.sizeOf(context)
@@ -14456,8 +13092,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                     .override(
                                                                       fontFamily:
                                                                           'Inter',
-                                                                      fontSize:
-                                                                          22.0,
+                                                                      fontSize: scaleFactor * 15.0,
                                                                       letterSpacing:
                                                                           0.0,
                                                                       fontWeight:
@@ -14471,12 +13106,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                         0.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: const EdgeInsetsDirectional
+                                                                  padding: EdgeInsetsDirectional
                                                                       .fromSTEB(
-                                                                          12.0,
-                                                                          0.0,
-                                                                          4.0,
-                                                                          0.0),
+                                                                          12.0 * scaleFactor,
+                                                                          0.0 * scaleFactor,
+                                                                          4.0 * scaleFactor,
+                                                                          0.0 * scaleFactor),
                                                                   child:
                                                                       Container(
                                                                     width: MediaQuery.sizeOf(context)
@@ -14507,8 +13142,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                     .override(
                                                                       fontFamily:
                                                                           'Inter',
-                                                                      fontSize:
-                                                                          22.0,
+                                                                      fontSize: scaleFactor * 15.0,
                                                                       letterSpacing:
                                                                           0.0,
                                                                       fontWeight:
@@ -14522,12 +13156,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                         0.0,
                                                                         0.0),
                                                                 child: Padding(
-                                                                  padding: const EdgeInsetsDirectional
+                                                                  padding: EdgeInsetsDirectional
                                                                       .fromSTEB(
-                                                                          12.0,
-                                                                          0.0,
-                                                                          4.0,
-                                                                          0.0),
+                                                                          12.0 * scaleFactor,
+                                                                          0.0 * scaleFactor,
+                                                                          4.0 * scaleFactor,
+                                                                          0.0 * scaleFactor),
                                                                   child:
                                                                       Container(
                                                                     width: MediaQuery.sizeOf(context)
@@ -14558,8 +13192,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                     .override(
                                                                       fontFamily:
                                                                           'Inter',
-                                                                      fontSize:
-                                                                          22.0,
+                                                                      fontSize: scaleFactor * 15.0,
                                                                       letterSpacing:
                                                                           0.0,
                                                                       fontWeight:
@@ -14607,8 +13240,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       'Inter',
                                                                   color: Colors
                                                                       .black,
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -14651,8 +13283,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                 .override(
                                                                   fontFamily:
                                                                       'Inter',
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -14677,8 +13308,8 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                   child: Align(
                                     alignment: const AlignmentDirectional(0.0, 0.0),
                                     child: Padding(
-                                      padding: const EdgeInsetsDirectional.fromSTEB(
-                                          0.0, 12.0, 0.0, 0.0),
+                                      padding: EdgeInsetsDirectional.fromSTEB(
+                                          0.0, 12.0 * scaleFactor, 0.0 * scaleFactor, 0.0 * scaleFactor),
                                       child: Row(
                                         mainAxisSize: MainAxisSize.max,
                                         mainAxisAlignment:
@@ -14717,12 +13348,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                     ),
                                                     child: Padding(
                                                       padding:
-                                                          const EdgeInsetsDirectional
+                                                          EdgeInsetsDirectional
                                                               .fromSTEB(
                                                                   8.0,
-                                                                  8.0,
-                                                                  8.0,
-                                                                  8.0),
+                                                                  8.0 * scaleFactor,
+                                                                  8.0 * scaleFactor,
+                                                                  8.0 * scaleFactor),
                                                       child: ClipRRect(
                                                         borderRadius:
                                                             BorderRadius
@@ -14743,9 +13374,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                           0.0, 0.0),
                                                   child: Padding(
                                                     padding:
-                                                        const EdgeInsetsDirectional
-                                                            .fromSTEB(0.0, 4.0,
-                                                                0.0, 0.0),
+                                                        EdgeInsetsDirectional
+                                                            .fromSTEB(0.0 * scaleFactor, 4.0 * scaleFactor,
+                                                                0.0 * scaleFactor, 0.0 * scaleFactor),
                                                     child: Container(
                                                       width: MediaQuery.sizeOf(
                                                                   context)
@@ -14794,9 +13425,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                           0.0, 1.0),
                                                   child: Padding(
                                                     padding:
-                                                        const EdgeInsetsDirectional
-                                                            .fromSTEB(0.0, 4.0,
-                                                                0.0, 0.0),
+                                                        EdgeInsetsDirectional
+                                                            .fromSTEB(0.0 * scaleFactor, 4.0 * scaleFactor,
+                                                                0.0 * scaleFactor, 0.0 * scaleFactor),
                                                     child: Container(
                                                       width: MediaQuery.sizeOf(
                                                                   context)
@@ -14816,12 +13447,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                       ),
                                                       child: Padding(
                                                         padding:
-                                                            const EdgeInsetsDirectional
+                                                            EdgeInsetsDirectional
                                                                 .fromSTEB(
                                                                     4.0,
-                                                                    0.0,
-                                                                    4.0,
-                                                                    0.0),
+                                                                    0.0 * scaleFactor,
+                                                                    4.0 * scaleFactor,
+                                                                    0.0 * scaleFactor),
                                                         child: Text(
                                                           '1. 이상 발생시 즉시 품질에 통보\n2. 자주검사 기준서 필히 숙지할것\n(양호 :O  불량발생:X  치수:치수기입)',
                                                           textAlign:
@@ -14832,7 +13463,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                               .override(
                                                                 fontFamily:
                                                                     'Inter',
-                                                                fontSize: 20.0,
+                                                                fontSize: scaleFactor * 20.0,
                                                                 letterSpacing:
                                                                     0.0,
                                                                 fontWeight:
@@ -14868,12 +13499,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                     children: [
                                                       Padding(
                                                         padding:
-                                                            const EdgeInsetsDirectional
+                                                            EdgeInsetsDirectional
                                                                 .fromSTEB(
                                                                     0.0,
-                                                                    0.0,
-                                                                    16.0,
-                                                                    0.0),
+                                                                    0.0 * scaleFactor,
+                                                                    16.0 * scaleFactor,
+                                                                    0.0 * scaleFactor),
                                                         child: InkWell(
                                                           splashColor: Colors
                                                               .transparent,
@@ -14907,12 +13538,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                 0.0, 0.0),
                                                         child: Padding(
                                                           padding:
-                                                              const EdgeInsetsDirectional
+                                                              EdgeInsetsDirectional
                                                                   .fromSTEB(
                                                                       0.0,
-                                                                      0.0,
-                                                                      16.0,
-                                                                      0.0),
+                                                                      0.0 * scaleFactor,
+                                                                      16.0 * scaleFactor,
+                                                                      0.0 * scaleFactor),
                                                           child: Text(
                                                             '날짜 : ',
                                                             textAlign: TextAlign
@@ -14923,8 +13554,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                 .override(
                                                                   fontFamily:
                                                                       'Inter',
-                                                                  fontSize:
-                                                                      35.0,
+                                                                  fontSize: scaleFactor * 35.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -14949,7 +13579,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                               .override(
                                                                 fontFamily:
                                                                     'Inter',
-                                                                fontSize: 35.0,
+                                                                fontSize: scaleFactor * 35.0,
                                                                 letterSpacing:
                                                                     0.0,
                                                                 fontWeight:
@@ -14960,12 +13590,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                       ),
                                                       Padding(
                                                         padding:
-                                                            const EdgeInsetsDirectional
+                                                            EdgeInsetsDirectional
                                                                 .fromSTEB(
                                                                     16.0,
-                                                                    0.0,
-                                                                    0.0,
-                                                                    0.0),
+                                                                    0.0 * scaleFactor,
+                                                                    0.0 * scaleFactor,
+                                                                    0.0 * scaleFactor),
                                                         child: InkWell(
                                                           splashColor: Colors
                                                               .transparent,
@@ -15006,8 +13636,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       .override(
                                                                         fontFamily:
                                                                             'Inter Tight',
-                                                                        fontSize:
-                                                                            32.0,
+                                                                        fontSize: scaleFactor * 32.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -15082,12 +13711,12 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                       ),
                                                       Padding(
                                                         padding:
-                                                            const EdgeInsetsDirectional
+                                                            EdgeInsetsDirectional
                                                                 .fromSTEB(
                                                                     16.0,
-                                                                    0.0,
-                                                                    0.0,
-                                                                    0.0),
+                                                                    0.0 * scaleFactor,
+                                                                    0.0 * scaleFactor,
+                                                                    0.0 * scaleFactor),
                                                         child: InkWell(
                                                           splashColor: Colors
                                                               .transparent,
@@ -15171,8 +13800,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                       'Inter',
                                                                   color: Colors
                                                                       .white,
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -15215,8 +13843,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                 .override(
                                                                   fontFamily:
                                                                       'Inter',
-                                                                  fontSize:
-                                                                      25.0,
+                                                                  fontSize: scaleFactor * 25.0,
                                                                   letterSpacing:
                                                                       0.0,
                                                                   fontWeight:
@@ -15230,9 +13857,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                   ),
                                                 ),
                                                 Padding(
-                                                  padding: const EdgeInsetsDirectional
+                                                  padding: EdgeInsetsDirectional
                                                       .fromSTEB(
-                                                          0.0, 4.0, 0.0, 4.0),
+                                                          0.0, 4.0 * scaleFactor, 0.0 * scaleFactor, 4.0 * scaleFactor),
                                                   child: Container(
                                                     width: MediaQuery.sizeOf(
                                                                 context)
@@ -15252,36 +13879,41 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                     ),
                                                     child: Padding(
                                                       padding:
-                                                          const EdgeInsetsDirectional
+                                                          EdgeInsetsDirectional
                                                               .fromSTEB(
                                                                   8.0,
-                                                                  8.0,
-                                                                  8.0,
-                                                                  8.0),
-                                                      child: ClipRRect(
+                                                                  8.0 * scaleFactor,
+                                                                  8.0 * scaleFactor,
+                                                                  8.0 * scaleFactor),
+                                                      child: InkWell(
+                                                        onTap : (){
+                                                          FFAppState().setIndex();
+                                                        },
+                                                        child: ClipRRect(
                                                         borderRadius:
                                                             BorderRadius
                                                                 .circular(8.0),
                                                         child: receivedImages[_model
-                                                                    .tabBarCurrentIndex] !=
+                                                                    .tabBarCurrentIndex][FFAppState().index] !=
                                                                 null
                                                             ? Image.memory(
                                                                 receivedImages[
                                                                     _model
-                                                                        .tabBarCurrentIndex]!,
+                                                                        .tabBarCurrentIndex][FFAppState().index]!,
                                                                 height: 300,
                                                                 width: double
                                                                     .infinity,
                                                                 fit: BoxFit
                                                                     .fitHeight,
                                                               )
-                                                            : Image.network(
-                                                                'https://picsum.photos/seed/510/60',
+                                                            : Image.asset(
+                                                                'assets/images/blank.png',
                                                                 width: 200.0,
                                                                 height: 200.0,
                                                                 fit: BoxFit
                                                                     .cover,
                                                               ),
+                                                            ),
                                                       ),
                                                     ),
                                                   ),
@@ -15295,9 +13927,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                       CrossAxisAlignment.end,
                                                   children: [
                                                     Padding(
-                                                      padding: const EdgeInsetsDirectional
+                                                      padding: EdgeInsetsDirectional
                                                           .fromSTEB(
-                                                              4.0, 4.0, 4.0, 4.0),
+                                                              4.0, 4.0 * scaleFactor, 4.0 * scaleFactor, 4.0 * scaleFactor),
                                                       child: Container(
                                                         width: MediaQuery.sizeOf(
                                                                     context)
@@ -15360,8 +13992,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                                 'Inter',
                                                                             color: Colors
                                                                                 .white,
-                                                                            fontSize:
-                                                                                25.0,
+                                                                            fontSize: scaleFactor * 25.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -15406,8 +14037,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                                 'Inter',
                                                                             color: Colors
                                                                                 .white,
-                                                                            fontSize:
-                                                                                25.0,
+                                                                            fontSize: scaleFactor * 25.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -15452,8 +14082,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                                 'Inter',
                                                                             color: Colors
                                                                                 .white,
-                                                                            fontSize:
-                                                                                25.0,
+                                                                            fontSize: scaleFactor * 25.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -15498,8 +14127,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                                 'Inter',
                                                                             color: Colors
                                                                                 .white,
-                                                                            fontSize:
-                                                                                25.0,
+                                                                            fontSize: scaleFactor * 25.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -15545,8 +14173,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                                 'Inter',
                                                                             color: Colors
                                                                                 .white,
-                                                                            fontSize:
-                                                                                25.0,
+                                                                            fontSize: scaleFactor * 25.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -15561,53 +14188,10 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                               mainAxisSize:
                                                                   MainAxisSize.max,
                                                               children: [
-                                                                Container(
-                                                                  width: MediaQuery
-                                                                              .sizeOf(
-                                                                                  context)
-                                                                          .width *
-                                                                      0.05,
-                                                                  height: MediaQuery
-                                                                              .sizeOf(
-                                                                                  context)
-                                                                          .height *
-                                                                      0.04,
-                                                                  decoration:
-                                                                      BoxDecoration(
-                                                                    color: const Color(
-                                                                        0x3308018C),
-                                                                    border:
-                                                                        Border.all(
-                                                                      color: const Color(
-                                                                          0x80000000),
-                                                                    ),
-                                                                  ),
-                                                                  child: Align(
-                                                                    alignment:
-                                                                        const AlignmentDirectional(
-                                                                            0.0,
-                                                                            0.0),
-                                                                    child: Text(
-                                                                      '1',
-                                                                      style: FlutterFlowTheme.of(
-                                                                              context)
-                                                                          .bodyMedium
-                                                                          .override(
-                                                                            fontFamily:
-                                                                                'Inter',
-                                                                            fontSize:
-                                                                                25.0,
-                                                                            letterSpacing:
-                                                                                0.0,
-                                                                            fontWeight:
-                                                                                FontWeight.w600,
-                                                                          ),
-                                                                    ),
-                                                                  ),
-                                                                ),
-                                                                IndexedText(),
-                                                                IndexedText(),
-                                                                IndexedText(),
+                                                                ClickableContainer(scaleFactor: scaleFactor, name: currentName, text: '1'),
+                                                                IndexedContainer(scaleFactor: scaleFactor),
+                                                                IndexedContainer(scaleFactor: scaleFactor),
+                                                                IndexedContainer(scaleFactor: scaleFactor),
                                                                 Container(
                                                                   width: MediaQuery
                                                                               .sizeOf(
@@ -15643,8 +14227,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                           .override(
                                                                             fontFamily:
                                                                                 'Inter',
-                                                                            fontSize:
-                                                                                23.0,
+                                                                            fontSize: scaleFactor * 23.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -15659,50 +14242,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                               mainAxisSize:
                                                                   MainAxisSize.max,
                                                               children: [
-                                                                Container(
-                                                                  width: MediaQuery
-                                                                              .sizeOf(
-                                                                                  context)
-                                                                          .width *
-                                                                      0.05,
-                                                                  height: MediaQuery
-                                                                              .sizeOf(
-                                                                                  context)
-                                                                          .height *
-                                                                      0.04,
-                                                                  decoration:
-                                                                      BoxDecoration(
-                                                                    color: const Color(
-                                                                        0x3308018C),
-                                                                    border:
-                                                                        Border.all(
-                                                                      color: const Color(
-                                                                          0x80000000),
-                                                                    ),
-                                                                  ),
-                                                                  child: Align(
-                                                                    alignment:
-                                                                        const AlignmentDirectional(
-                                                                            0.0,
-                                                                            0.0),
-                                                                    child: Text(
-                                                                      '2',
-                                                                      style: FlutterFlowTheme.of(
-                                                                              context)
-                                                                          .bodyMedium
-                                                                          .override(
-                                                                            fontFamily:
-                                                                                'Inter',
-                                                                            fontSize:
-                                                                                25.0,
-                                                                            letterSpacing:
-                                                                                0.0,
-                                                                            fontWeight:
-                                                                                FontWeight.w600,
-                                                                          ),
-                                                                    ),
-                                                                  ),
-                                                                ),
+                                                                ClickableContainer(scaleFactor: scaleFactor, name: currentName, text: '2'),
                                                                 Container(
                                                                   width: MediaQuery
                                                                               .sizeOf(
@@ -15742,8 +14282,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                           .override(
                                                                             fontFamily:
                                                                                 'Inter',
-                                                                            fontSize:
-                                                                                23.0,
+                                                                            fontSize: scaleFactor * 23.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -15791,8 +14330,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                           .override(
                                                                             fontFamily:
                                                                                 'Inter',
-                                                                            fontSize:
-                                                                                23.0,
+                                                                            fontSize: scaleFactor * 23.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -15840,8 +14378,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                           .override(
                                                                             fontFamily:
                                                                                 'Inter',
-                                                                            fontSize:
-                                                                                23.0,
+                                                                            fontSize: scaleFactor * 23.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -15888,8 +14425,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                           .override(
                                                                             fontFamily:
                                                                                 'Inter',
-                                                                            fontSize:
-                                                                                23.0,
+                                                                            fontSize: scaleFactor * 23.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -15904,50 +14440,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                               mainAxisSize:
                                                                   MainAxisSize.max,
                                                               children: [
-                                                                Container(
-                                                                  width: MediaQuery
-                                                                              .sizeOf(
-                                                                                  context)
-                                                                          .width *
-                                                                      0.05,
-                                                                  height: MediaQuery
-                                                                              .sizeOf(
-                                                                                  context)
-                                                                          .height *
-                                                                      0.04,
-                                                                  decoration:
-                                                                      BoxDecoration(
-                                                                    color: const Color(
-                                                                        0x3308018C),
-                                                                    border:
-                                                                        Border.all(
-                                                                      color: const Color(
-                                                                          0x80000000),
-                                                                    ),
-                                                                  ),
-                                                                  child: Align(
-                                                                    alignment:
-                                                                        const AlignmentDirectional(
-                                                                            0.0,
-                                                                            0.0),
-                                                                    child: Text(
-                                                                      '3',
-                                                                      style: FlutterFlowTheme.of(
-                                                                              context)
-                                                                          .bodyMedium
-                                                                          .override(
-                                                                            fontFamily:
-                                                                                'Inter',
-                                                                            fontSize:
-                                                                                25.0,
-                                                                            letterSpacing:
-                                                                                0.0,
-                                                                            fontWeight:
-                                                                                FontWeight.w600,
-                                                                          ),
-                                                                    ),
-                                                                  ),
-                                                                ),
+                                                                ClickableContainer(scaleFactor: scaleFactor, name: currentName, text: '3'),
                                                                 Container(
                                                                   width: MediaQuery
                                                                               .sizeOf(
@@ -15987,8 +14480,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                           .override(
                                                                             fontFamily:
                                                                                 'Inter',
-                                                                            fontSize:
-                                                                                23.0,
+                                                                            fontSize: scaleFactor * 23.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -16036,8 +14528,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                           .override(
                                                                             fontFamily:
                                                                                 'Inter',
-                                                                            fontSize:
-                                                                                23.0,
+                                                                            fontSize: scaleFactor * 23.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -16085,8 +14576,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                           .override(
                                                                             fontFamily:
                                                                                 'Inter',
-                                                                            fontSize:
-                                                                                23.0,
+                                                                            fontSize: scaleFactor * 23.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -16133,8 +14623,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                           .override(
                                                                             fontFamily:
                                                                                 'Inter',
-                                                                            fontSize:
-                                                                                23.0,
+                                                                            fontSize: scaleFactor * 23.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -16149,53 +14638,10 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                               mainAxisSize:
                                                                   MainAxisSize.max,
                                                               children: [
-                                                                Container(
-                                                                  width: MediaQuery
-                                                                              .sizeOf(
-                                                                                  context)
-                                                                          .width *
-                                                                      0.05,
-                                                                  height: MediaQuery
-                                                                              .sizeOf(
-                                                                                  context)
-                                                                          .height *
-                                                                      0.04,
-                                                                  decoration:
-                                                                      BoxDecoration(
-                                                                    color: const Color(
-                                                                        0x3308018C),
-                                                                    border:
-                                                                        Border.all(
-                                                                      color: const Color(
-                                                                          0x80000000),
-                                                                    ),
-                                                                  ),
-                                                                  child: Align(
-                                                                    alignment:
-                                                                        const AlignmentDirectional(
-                                                                            0.0,
-                                                                            0.0),
-                                                                    child: Text(
-                                                                      '4',
-                                                                      style: FlutterFlowTheme.of(
-                                                                              context)
-                                                                          .bodyMedium
-                                                                          .override(
-                                                                            fontFamily:
-                                                                                'Inter',
-                                                                            fontSize:
-                                                                                25.0,
-                                                                            letterSpacing:
-                                                                                0.0,
-                                                                            fontWeight:
-                                                                                FontWeight.w600,
-                                                                          ),
-                                                                    ),
-                                                                  ),
-                                                                ),
-                                                                IndexedText(),
-                                                                IndexedText(),
-                                                                IndexedText(),
+                                                                ClickableContainer(scaleFactor: scaleFactor, name: currentName, text: '4'),
+                                                                IndexedContainer(scaleFactor: scaleFactor),
+                                                                IndexedContainer(scaleFactor: scaleFactor),
+                                                                IndexedContainer(scaleFactor: scaleFactor),
                                                                 Container(
                                                                   width: MediaQuery
                                                                               .sizeOf(
@@ -16231,8 +14677,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                           .override(
                                                                             fontFamily:
                                                                                 'Inter',
-                                                                            fontSize:
-                                                                                23.0,
+                                                                            fontSize: scaleFactor * 23.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -16247,50 +14692,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                               mainAxisSize:
                                                                   MainAxisSize.max,
                                                               children: [
-                                                                Container(
-                                                                  width: MediaQuery
-                                                                              .sizeOf(
-                                                                                  context)
-                                                                          .width *
-                                                                      0.05,
-                                                                  height: MediaQuery
-                                                                              .sizeOf(
-                                                                                  context)
-                                                                          .height *
-                                                                      0.04,
-                                                                  decoration:
-                                                                      BoxDecoration(
-                                                                    color: const Color(
-                                                                        0x3308018C),
-                                                                    border:
-                                                                        Border.all(
-                                                                      color: const Color(
-                                                                          0x80000000),
-                                                                    ),
-                                                                  ),
-                                                                  child: Align(
-                                                                    alignment:
-                                                                        const AlignmentDirectional(
-                                                                            0.0,
-                                                                            0.0),
-                                                                    child: Text(
-                                                                      '5',
-                                                                      style: FlutterFlowTheme.of(
-                                                                              context)
-                                                                          .bodyMedium
-                                                                          .override(
-                                                                            fontFamily:
-                                                                                'Inter',
-                                                                            fontSize:
-                                                                                25.0,
-                                                                            letterSpacing:
-                                                                                0.0,
-                                                                            fontWeight:
-                                                                                FontWeight.w600,
-                                                                          ),
-                                                                    ),
-                                                                  ),
-                                                                ),
+                                                                ClickableContainer(scaleFactor: scaleFactor, name: currentName, text: '5'),
                                                                 Container(
                                                                   width: MediaQuery
                                                                               .sizeOf(
@@ -16330,8 +14732,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                           .override(
                                                                             fontFamily:
                                                                                 'Inter',
-                                                                            fontSize:
-                                                                                23.0,
+                                                                            fontSize: scaleFactor * 23.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -16379,8 +14780,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                           .override(
                                                                             fontFamily:
                                                                                 'Inter',
-                                                                            fontSize:
-                                                                                23.0,
+                                                                            fontSize: scaleFactor * 23.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -16421,15 +14821,14 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                           Constants
                                                                               .names[5],
                                                                           "5",
-                                                                          1),
+                                                                          2),
                                                                       style: FlutterFlowTheme.of(
                                                                               context)
                                                                           .bodyMedium
                                                                           .override(
                                                                             fontFamily:
                                                                                 'Inter',
-                                                                            fontSize:
-                                                                                23.0,
+                                                                            fontSize: scaleFactor * 23.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -16476,8 +14875,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                           .override(
                                                                             fontFamily:
                                                                                 'Inter',
-                                                                            fontSize:
-                                                                                23.0,
+                                                                            fontSize: scaleFactor * 23.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -16492,53 +14890,10 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                               mainAxisSize:
                                                                   MainAxisSize.max,
                                                               children: [
-                                                                Container(
-                                                                  width: MediaQuery
-                                                                              .sizeOf(
-                                                                                  context)
-                                                                          .width *
-                                                                      0.05,
-                                                                  height: MediaQuery
-                                                                              .sizeOf(
-                                                                                  context)
-                                                                          .height *
-                                                                      0.04,
-                                                                  decoration:
-                                                                      BoxDecoration(
-                                                                    color: const Color(
-                                                                        0x3308018C),
-                                                                    border:
-                                                                        Border.all(
-                                                                      color: const Color(
-                                                                          0x80000000),
-                                                                    ),
-                                                                  ),
-                                                                  child: Align(
-                                                                    alignment:
-                                                                        const AlignmentDirectional(
-                                                                            0.0,
-                                                                            0.0),
-                                                                    child: Text(
-                                                                      '6',
-                                                                      style: FlutterFlowTheme.of(
-                                                                              context)
-                                                                          .bodyMedium
-                                                                          .override(
-                                                                            fontFamily:
-                                                                                'Inter',
-                                                                            fontSize:
-                                                                                25.0,
-                                                                            letterSpacing:
-                                                                                0.0,
-                                                                            fontWeight:
-                                                                                FontWeight.w600,
-                                                                          ),
-                                                                    ),
-                                                                  ),
-                                                                ),
-                                                                IndexedText(),
-                                                                IndexedText(),
-                                                                IndexedText(),
+                                                                ClickableContainer(scaleFactor: scaleFactor, name: currentName, text: '6'),
+                                                                IndexedContainer(scaleFactor: scaleFactor),
+                                                                IndexedContainer(scaleFactor: scaleFactor),
+                                                                IndexedContainer(scaleFactor: scaleFactor),
                                                                 Container(
                                                                   width: MediaQuery
                                                                               .sizeOf(
@@ -16574,8 +14929,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                           .override(
                                                                             fontFamily:
                                                                                 'Inter',
-                                                                            fontSize:
-                                                                                23.0,
+                                                                            fontSize: scaleFactor * 23.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -16624,8 +14978,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                           .override(
                                                                             fontFamily:
                                                                                 'Inter',
-                                                                            fontSize:
-                                                                                25.0,
+                                                                            fontSize: scaleFactor * 25.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -16634,9 +14987,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                     ),
                                                                   ),
                                                                 ),
-                                                                IndexedText(),
-                                                                IndexedText(),
-                                                                IndexedText(),
+                                                                IndexedContainer(scaleFactor: scaleFactor),
+                                                                IndexedContainer(scaleFactor: scaleFactor),
+                                                                IndexedContainer(scaleFactor: scaleFactor),
                                                                 Container(
                                                                   width: MediaQuery
                                                                               .sizeOf(
@@ -16672,8 +15025,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                           .override(
                                                                             fontFamily:
                                                                                 'Inter',
-                                                                            fontSize:
-                                                                                23.0,
+                                                                            fontSize: scaleFactor * 23.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -16722,8 +15074,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                           .override(
                                                                             fontFamily:
                                                                                 'Inter',
-                                                                            fontSize:
-                                                                                25.0,
+                                                                            fontSize: scaleFactor * 25.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -16732,9 +15083,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                     ),
                                                                   ),
                                                                 ),
-                                                                IndexedText(),
-                                                                IndexedText(),
-                                                                IndexedText(),
+                                                                IndexedContainer(scaleFactor: scaleFactor),
+                                                                IndexedContainer(scaleFactor: scaleFactor),
+                                                                IndexedContainer(scaleFactor: scaleFactor),
                                                                 Container(
                                                                   width: MediaQuery
                                                                               .sizeOf(
@@ -16770,8 +15121,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                           .override(
                                                                             fontFamily:
                                                                                 'Inter',
-                                                                            fontSize:
-                                                                                23.0,
+                                                                            fontSize: scaleFactor * 23.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -16820,8 +15170,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                           .override(
                                                                             fontFamily:
                                                                                 'Inter',
-                                                                            fontSize:
-                                                                                25.0,
+                                                                            fontSize: scaleFactor * 25.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -16830,9 +15179,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                     ),
                                                                   ),
                                                                 ),
-                                                                IndexedText(),
-                                                                IndexedText(),
-                                                                IndexedText(),
+                                                                IndexedContainer(scaleFactor: scaleFactor),
+                                                                IndexedContainer(scaleFactor: scaleFactor),
+                                                                IndexedContainer(scaleFactor: scaleFactor),
                                                                 Container(
                                                                   width: MediaQuery
                                                                               .sizeOf(
@@ -16868,8 +15217,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                                           .override(
                                                                             fontFamily:
                                                                                 'Inter',
-                                                                            fontSize:
-                                                                                23.0,
+                                                                            fontSize: scaleFactor * 23.0,
                                                                             letterSpacing:
                                                                                 0.0,
                                                                             fontWeight:
@@ -16884,14 +15232,14 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                                                     ),
                                                   ),
                                                 ),
-                                                const DownloadButton()
+                                                const DownloadButton(type: 'week')
                                               ].addToStart(
                                                   const SizedBox(width: 40.0)),
                                               
                                             ),
-                                           ],                                          
+                                          ],                                          
                                           ),
-                                         ), 
+                                          ), 
                                         ],
                                       ), 
                                     ),
@@ -16912,7 +15260,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                           labelStyle:
                               FlutterFlowTheme.of(context).titleMedium.override(
                                     fontFamily: 'Inter Tight',
-                                    fontSize: 23.0,
+                                    fontSize: scaleFactor * 23.0,
                                     letterSpacing: 0.0,
                                   ),
                           unselectedLabelStyle:
@@ -16931,8 +15279,8 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                           borderWidth: 2.0,
                           borderRadius: 8.0,
                           elevation: 0.0,
-                          buttonMargin: const EdgeInsetsDirectional.fromSTEB(
-                              8.0, 0.0, 8.0, 0.0),
+                          buttonMargin: EdgeInsetsDirectional.fromSTEB(
+                              8.0, 0.0 * scaleFactor, 8.0 * scaleFactor, 0.0 * scaleFactor),
                           tabs: [
                             const Tab(
                               text: 'MS-010',
@@ -16956,23 +15304,55 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                           controller: _model.tabBarController,
                           onTap: (i) async {
                             [
-                              () async {},
-                              () async {},
-                              () async {},
-                              () async {},
-                              () async {},
-                              () async {}
+                              () async {
+                                currentName = 'MS-010';
+                                FFAppState().CurrentName = 'MS-010';
+                              },() async {
+                                currentName = 'MS-011';
+                                FFAppState().CurrentName = 'MS-011';
+                              },() async {
+                                currentName = 'MS-012';
+                                FFAppState().CurrentName = 'MS-012';
+                              },() async {
+                                currentName = 'MS-013';
+                                FFAppState().CurrentName = 'MS-013';
+                              },() async {
+                                currentName = 'MS-014';
+                                FFAppState().CurrentName = 'MS-014';
+                              },() async {
+                                currentName = 'MS-015';
+                                FFAppState().CurrentName = 'MS-015';
+                              },
                             ][i]();
                           },
                         ),
                       ),
                     ],
                   ),
-                ),
               ),
             ],
           ),
-        ),
+          if (FFAppState().isLoading)
+                Container(
+                  color: Colors.black.withOpacity(0.5), // 배경을 반투명하게 설정
+                  child: const Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CircularProgressIndicator(), // 로딩 스피너
+                        SizedBox(height: 16), // 간격 조정
+                        Text(
+                          "엑셀 파일 생성중입니다...",
+                          style: TextStyle(fontSize: 18, color: Colors.white),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ]
+            ),
+        );
+        }
       ),
     );
   }

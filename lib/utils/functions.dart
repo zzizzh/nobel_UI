@@ -24,6 +24,16 @@ String getValue(String name, String checkNum, int index){
   return '';
 }
 
+String getErrorNum(String name){
+  String currentDate = FFAppState().CurrentDate;
+  if (Measurements.data[name]!.containsKey(currentDate)){
+    return Measurements.data[name]![currentDate]!.getErrorCount().toString();
+  }
+  else{
+    return '';
+  }
+}
+
 /// UI 평균값 칸에 값을 표시
 /// param 1 :    소재 이름
 /// param 2 :    검사 항목 번호
@@ -94,6 +104,40 @@ bool hasDateInData(String date){
 }
 
 
+  Future<void> sendJsonData(String type, {dynamic jsonMap}) async {
+    String host = '127.0.0.1';
+    int port = 12345;
+    dynamic jsonData;  
+    var logger = AppLogger.instance;
+    try {
+      // 소켓 연결
+      if (FFAppState().socket == null){
+        FFAppState().socket = await Socket.connect('127.0.0.1', 12345);
+      }
+      Socket socket = FFAppState().socket!;
+
+      logger.i('서버에 연결됨: $host:$port');
+      if (type == 'week'){
+        jsonData = toJsonFromStartDateToWeek(FFAppState().CurrentDate);
+      }
+      // JSON 데이터를 문자열로 변환 후 전송
+      else{
+        jsonData = jsonMap;
+      }
+      String jsonString = jsonEncode(jsonData);
+      socket.write(jsonString);
+      logger.i('데이터 전송 완료: $jsonString');
+
+      
+    } catch (e) {
+      logger.e('소켓 오류 발생\n $e');
+    }
+
+    return jsonData;
+  }
+
+
+
 /// 자주검사 체크시트 엑셀 파일에 값을 입력하기 위해
 /// 특정 품목의 자주검사 한 주의 검사 데이터를 Json 형식의 데이터로 변환
 /// param 1 :    String 시작 날짜(보통 월요일이지만 공휴일일 경우도 있기 때문)
@@ -135,7 +179,7 @@ dynamic toJsonFromStartDateToSaturday(String startDateString){
 dynamic toJsonFromCurrentMonth(String name){
   String currentDate = FFAppState().CurrentDate;
   String startDate = '${currentDate.substring(0, currentDate.length - 2)}01';
-  int currentMonth = FFAppState().getCurrentMonth();
+  String currentMonth = FFAppState().getCurrentMonth();
 
   Map data = Measurements.data;
 
@@ -157,20 +201,27 @@ dynamic toJsonFromCurrentMonth(String name){
       DateTime nextDate = dateTime.add(const Duration(days: 1));
 
       date = DateFormat('yyyy-MM-dd').format(nextDate);
-      startDate = date;
-      continue;
     }
 
-    dateList.add(date);
+    if (Measurements.data[name].containsKey(date)){
+        dateList.add(date);
+    }
     startDate = date;
   }
-  dynamic jsonMap = {};
+  dynamic jsonMap = {
+    
+  };
 
-  for(String name in Constants.names){
-    for(String date in dateList){
-      jsonMap[date] = data[name][date];
+  for(String date in dateList){
+    if (data[name].containsKey(date)){
+      if (jsonMap['data_list'] == null){
+        jsonMap['data_list'] = {};
+      }
+      jsonMap['data_list'][date] = data[name][date].measurements;
     }
   }
+
+  AppLogger.instance.i(jsonMap);
 
   return jsonMap;
 }
@@ -357,7 +408,7 @@ Future<void> saveExcelFile({
             }
 
             sheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row)).value = data.measurements[checkNum][i];
-            String newFilePath = 'C:\\UND\\$firstDate$dataIndex';
+            String newFilePath = 'C:\\nobel\\$firstDate$dataIndex';
             var newFile = File(newFilePath)
               ..createSync(recursive: true)
               ..writeAsBytesSync(excel.encode()!);
@@ -372,7 +423,7 @@ Future<void> saveExcelFile({
     }
     
     // 4. 새 파일로 저장
-    String newFilePath = 'C:\\UND\\$firstDate$dataIndex';
+    String newFilePath = 'C:\\nobel\\$firstDate$dataIndex';
     var newFile = File(newFilePath)
       ..createSync(recursive: true)
       ..writeAsBytesSync(excel.encode()!);

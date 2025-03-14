@@ -1,9 +1,10 @@
+import '/flutter_flow/flutter_flow_util.dart';
+import 'main_widget.dart' show MainPage;
+import 'package:flutter/material.dart';
 import '/flutter_flow/flutter_flow_button_tabbar.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
-import 'dart:ui';
-import 'main_widget.dart' show MainPage;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';

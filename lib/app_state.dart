@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'data/nobel_data.dart';
 import 'flutter_flow/flutter_flow_util.dart';
 import 'package:intl/intl.dart';
@@ -27,7 +26,68 @@ class FFAppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  int _index=0;
+  int get index => _index;
+  void setIndex(){
+    _index += 1;
+    _index %= 2;
+    notifyListeners();
+  }
+  
 
+  dynamic _outputDatas= {
+    'X_2bar=' : '',
+    'R_bar=' : '',
+    'Xbar UCL=' : '',
+    'Xbar CL=' : '',
+    'Xbar LCL=' : '',
+    'R UCL=' : '',
+    'R CL=' : '',
+    'sigma=' : '',
+    'Cp=' : '',
+    'Cpk=' : '',
+    '예상불량(ppm)' : ''
+  };
+
+  dynamic get outputDatas => _outputDatas;
+  void initOutputDatas(){
+    _outputDatas= {
+      'X_2bar=' : '',
+      'R_bar=' : '',
+      'Xbar UCL=' : '',
+      'Xbar CL=' : '',
+      'Xbar LCL=' : '',
+      'R UCL=' : '',
+      'R CL=' : '',
+      'sigma=' : '',
+      'Cp=' : '',
+      'Cpk=' : '',
+      '예상불량(ppm)' : ''
+    };
+    _isLoading = false;
+  }
+
+  void setOutputDatas(dynamic data){
+    _outputDatas = data;
+    _isLoading = false;
+    notifyListeners();
+  }
+
+  bool _isPLCConnected = false;
+  bool get isPLCConnected => _isPLCConnected;
+  
+  void setPLCConnect(bool value){
+    _isPLCConnected = value;
+    notifyListeners();
+  }
+
+  bool _isLoading = false;
+  void setIsLoading(bool value){
+    _isLoading = value;
+    notifyListeners();
+  }
+  
+  bool get isLoading => _isLoading;
 
   Socket? socket;
   String _CurrentDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
@@ -35,6 +95,14 @@ class FFAppState extends ChangeNotifier {
   
   set CurrentDate(String value) {
     _CurrentDate = value;
+    notifyListeners();
+  }
+
+  String _CurrentName = 'MS-010';
+  String get CurrentName => _CurrentName;
+
+  set CurrentName(String name){
+    _CurrentName = name;
   }
 
   Measurements? writeValue(var jsonData){
@@ -73,7 +141,7 @@ class FFAppState extends ChangeNotifier {
     _displayDate = value;
   }
 
-  int getCurrentMonth({String date = ''}){
+  String getCurrentMonth({String date = ''}){
     String month;
     if (date == ''){
       month = CurrentDate.split('-')[1];
@@ -81,12 +149,6 @@ class FFAppState extends ChangeNotifier {
     else{
       month = date.split('-')[1];
     }
-    
-    if (int.tryParse(month) == null){
-      return 0;
-    }
-    else{
-      return int.parse(month);
-    }
+    return month;
   }
 }
